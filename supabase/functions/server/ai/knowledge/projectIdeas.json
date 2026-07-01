@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Kampanye Lingkungan Sekolah Bersih",
+    "subject": "Sains / IPS / PPKn",
+    "level": "SD / SMP / SMA",
+    "description": "Siswa membuat analisis sampah sekolah dan merancang kampanye/alat pengurangan limbah plastik.",
+    "activities": [
+      "Audit jenis sampah harian sekolah.",
+      "Membuat poster kampanye daur ulang.",
+      "Merancang tempat sampah pilah kreatif."
+    ],
+    "duration_weeks": 3
+  },
+  {
+    "title": "Aplikasi Konsep Matematika dalam Bisnis Kuliner Kecil",
+    "subject": "Matematika / Prakarya",
+    "level": "SMP / SMA",
+    "description": "Proyek simulasi merencanakan produk makanan ringan, menghitung harga pokok penjualan (HPP), dan laba/rugi.",
+    "activities": [
+      "Menentukan resep makanan dan menaksir modal.",
+      "Menghitung HPP dengan rumus aritmatika sosial.",
+      "Melakukan presentasi simulasi pitch penjualan."
+    ],
+    "duration_weeks": 2
+  },
+  {
+    "title": "Dokumentasi Budaya Lokal Lewat Media Digital",
+    "subject": "Bahasa Indonesia / IPS / Seni Budaya",
+    "level": "SMP / SMA",
+    "description": "Siswa melakukan riset sejarah/seni tradisi di lingkungan sekitar dan mengemasnya dalam artikel/video pendek.",
+    "activities": [
+      "Wawancara tokoh adat/tetua lingkungan.",
+      "Penyusunan naskah dokumenter digital.",
+      "Pameran karya digital/video review di kelas."
+    ],
+    "duration_weeks": 4
+  }
+]

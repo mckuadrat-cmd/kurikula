@@ -1,0 +1,114 @@
+{
+  "Disiplin": {
+    "indicators": [
+      "Hadir tepat waktu di kelas atau saat kerja kelompok.",
+      "Mengumpulkan tugas sebelum atau sesuai dengan tenggat waktu.",
+      "Mentaati tata tertib kelas dan prosedur keselamatan pembelajaran."
+    ],
+    "observation_method": "Checklist perilaku harian atau catatan anekdot guru.",
+    "reflection_questions": [
+      "Apakah hari ini saya sudah mengatur waktu saya dengan baik?",
+      "Apa hambatan yang membuat saya menunda pekerjaan hari ini?"
+    ],
+    "reinforcement_strategies": [
+      "Apresiasi verbal langsung saat siswa mengumpulkan tugas tercepat.",
+      "Pemberian bintang kehadiran/kedisiplinan di papan skor kelas."
+    ]
+  },
+  "Tanggung Jawab": {
+    "indicators": [
+      "Menyelesaikan tugas kelompok yang didelegasikan kepadanya dengan tuntas.",
+      "Mengakui kesalahan diri sendiri dan bersedia menerima konsekuensinya.",
+      "Menjaga kebersihan dan kerapihan barang milik pribadi maupun sekolah."
+    ],
+    "observation_method": "Lembar penilaian diri (self-assessment) dan penilaian antar teman.",
+    "reflection_questions": [
+      "Apakah saya sudah menyelesaikan bagian tugas saya dengan sungguh-sungguh?",
+      "Bagaimana kontribusi saya mempengaruhi hasil kerja kelompok hari ini?"
+    ],
+    "reinforcement_strategies": [
+      "Penunjukan siswa sebagai penanggung jawab alat/kegiatan berikutnya.",
+      "Sertifikat apresiasi bulanan 'Siswa Paling Bertanggung Jawab'."
+    ]
+  },
+  "Integritas": {
+    "indicators": [
+      "Mengerjakan asesmen secara mandiri tanpa menyontek atau plagiasi.",
+      "Mengatakan kebenaran meskipun dalam situasi yang menekan.",
+      "Konsisten antara perkataan dan perbuatan selama interaksi di kelas."
+    ],
+    "observation_method": "Observasi insidental guru dan kejujuran dalam pelaporan praktikum.",
+    "reflection_questions": [
+      "Apakah hasil kerja yang saya kumpulkan benar-benar karya orisinal saya?",
+      "Apakah tindakan saya hari ini sudah mencerminkan nilai-nilai moral yang saya percayai?"
+    ],
+    "reinforcement_strategies": [
+      "Pengakuan kejujuran siswa di depan kelas (positive public praise).",
+      "Pemberian poin karakter integritas pada rapor karakter."
+    ]
+  },
+  "Empati": {
+    "indicators": [
+      "Mendengarkan dengan aktif dan penuh perhatian saat teman berpendapat.",
+      "Menawarkan bantuan secara sukarela kepada teman yang mengalami kesulitan belajar.",
+      "Menghargai perbedaan pendapat dan latar belakang teman di kelas."
+    ],
+    "observation_method": "Observasi sosiometri kelas dan interaksi sosial harian.",
+    "reflection_questions": [
+      "Bagaimana saya menunjukkan kepedulian saya terhadap teman yang sedang sedih/kesulitan hari ini?",
+      "Apakah kata-kata saya hari ini menyinggung perasaan orang lain?"
+    ],
+    "reinforcement_strategies": [
+      "Apresiasi 'Peer-Nominated Award' (Siswa terpeduli pilihan kelas).",
+      "Ucapan terima kasih tertulis dari guru dalam bentuk kartu apresiasi kecil."
+    ]
+  },
+  "Kolaborasi": {
+    "indicators": [
+      "Aktif berbagi ide dan materi pendukung dalam diskusi kelompok.",
+      "Menerima keputusan kelompok dengan lapang dada meskipun berbeda dari ide awal diri.",
+      "Membagi peran dan bekerja secara harmonis dengan semua anggota tim."
+    ],
+    "observation_method": "Lembar observasi kolaborasi kelompok (peer-evaluation).",
+    "reflection_questions": [
+      "Apakah saya membiarkan teman lain mendominasi kelompok atau saya aktif bekerja sama?",
+      "Bagaimana saya menanggapi perbedaan ide di dalam kelompok saya?"
+    ],
+    "reinforcement_strategies": [
+      "Apresiasi Kelompok Terbaik (bukan sekadar individu terbaik) di akhir bab.",
+      "Tepuk tangan kelompok (group appreciation applause) di depan kelas."
+    ]
+  },
+  "Kepemimpinan": {
+    "indicators": [
+      "Mengarahkan anggota kelompok untuk fokus menyelesaikan tugas bersama.",
+      "Mengorganisasi pembagian tugas secara adil dan teratur.",
+      "Memberikan motivasi dan menyemangati teman kelompok yang kurang bersemangat."
+    ],
+    "observation_method": "Penilaian performa kepemimpinan dalam simulasi/proyek.",
+    "reflection_questions": [
+      "Bagaimana saya membantu anggota kelompok saya bekerja lebih efektif?",
+      "Apakah saya memimpin secara otoriter atau merangkul semua pendapat kelompok?"
+    ],
+    "reinforcement_strategies": [
+      "Pemberian umpan balik khusus tentang keterampilan kepemimpinan siswa.",
+      "Peluang memimpin proyek/kegiatan kelas berskala lebih besar berikutnya."
+    ]
+  },
+  "Kemandirian": {
+    "indicators": [
+      "Mulai mengerjakan tugas secara inisiatif tanpa harus selalu disuruh.",
+      "Mampu mencari solusi mandiri dengan membaca petunjuk sebelum bertanya kepada guru.",
+      "Mampu mengelola emosi dan konsentrasi belajar secara mandiri di kelas."
+    ],
+    "observation_method": "Jurnal belajar mandiri siswa atau checklist kemandirian instruksional.",
+    "reflection_questions": [
+      "Apakah saya langsung bertanya sebelum mencoba memecahkan masalah ini sendiri?",
+      "Sejauh mana saya bisa menyelesaikan kegiatan hari ini tanpa bantuan orang lain?"
+    ],
+    "reinforcement_strategies": [
+      "Pujian atas kemajuan kemandirian kerja siswa (growth mindset feedback).",
+      "Pemberian otonomi lebih dalam menentukan cara menyelesaikan tugas."
+    ]
+  }
+}

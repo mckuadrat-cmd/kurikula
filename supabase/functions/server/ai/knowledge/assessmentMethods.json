@@ -1,0 +1,38 @@
+{
+  "C1": {
+    "level_name": "Mengingat (Remembering)",
+    "recommended_assessment": "Pilihan Ganda atau Isian Singkat",
+    "reasoning": "Sangat efektif untuk mengukur memori faktual, definisi, rumus, simbol, dan fakta dasar secara cepat.",
+    "alternatives": ["Kuis Benar/Salah", "Flashcards", "Pertanyaan Lisan Cepat"]
+  },
+  "C2": {
+    "level_name": "Memahami (Understanding)",
+    "recommended_assessment": "Essay Penjelasan Singkat atau Pilihan Ganda Kompleks",
+    "reasoning": "Mampu menguji pemahaman konsep dengan meminta siswa menjelaskan dengan kata-kata sendiri, membandingkan, atau mengelompokkan konsep.",
+    "alternatives": ["Membuat Peta Pikiran (Mind Map)", "Meringkas Materi", "Menjodohkan Konsep"]
+  },
+  "C3": {
+    "level_name": "Menerapkan (Applying)",
+    "recommended_assessment": "Studi Kasus Sederhana atau Soal Latihan Pemecahan Masalah",
+    "reasoning": "Menguji kemampuan siswa mentransfer pengetahuan teoritis ke dalam konteks baru/soal cerita terapan.",
+    "alternatives": ["Praktikum Terbimbing", "Simulasi Peran", "Lembar Kerja Eksperimen"]
+  },
+  "C4": {
+    "level_name": "Menganalisis (Analyzing)",
+    "recommended_assessment": "Studi Kasus Analitis atau Analisis Data/Grafik",
+    "reasoning": "Menguji kemampuan mengurai komponen-komponen informasi, membedakan fakta dan opini, atau mendeteksi pola hubungan sebab-akibat.",
+    "alternatives": ["Tugas Makalah Komparatif", "Presentasi Poster Analitis", "Debat Terstruktur"]
+  },
+  "C5": {
+    "level_name": "Mengevaluasi (Evaluating)",
+    "recommended_assessment": "Penilaian Produk dengan Rubrik atau Menulis Opini Kritis",
+    "reasoning": "Siswa diminta mengambil keputusan berdasarkan kriteria/standar tertentu, memberikan kritik konstruktif, atau menilai kelayakan alternatif.",
+    "alternatives": ["Self-Assessment", "Peer Review Umpan Balik", "Studi Kelayakan Alternatif"]
+  },
+  "C6": {
+    "level_name": "Mencipta (Creating)",
+    "recommended_assessment": "Penilaian Proyek (Project-Based Assessment) atau Portofolio Hasil Karya",
+    "reasoning": "Tingkat kognitif tertinggi yang meminta siswa mensintesis elemen-elemen terpisah menjadi satu kesatuan fungsional yang baru atau orisinal.",
+    "alternatives": ["Perancangan Prototipe", "Penulisan Cerita/Karya Seni", "Pengembangan Rencana Bisnis Sederhana"]
+  }
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Tebak Kata Tanpa Suara (Charades)",
+    "duration_minutes": 5,
+    "energy_level": "Medium",
+    "description": "Satu siswa memperagakan sebuah kata/istilah pelajaran di depan kelas menggunakan gerakan tubuh tanpa bersuara, siswa lain menebak.",
+    "kegunaan": "Meningkatkan fokus belajar kelompok, melatih kreativitas nonverbal, menyegarkan suasana kelas mengantuk."
+  },
+  {
+    "name": "Sambung Kalimat Cerita Kreatif",
+    "duration_minutes": 7,
+    "energy_level": "Low",
+    "description": "Guru memulai dengan satu kalimat awal (misal: 'Kemarin saya pergi ke hutan...'), siswa berikutnya melanjutkan dengan satu kalimat baru, berurutan cepat melingkar.",
+    "kegunaan": "Melatih konsentrasi menyimak, mempererat keakraban antar siswa, dan merangsang imajinasi bercerita."
+  },
+  {
+    "name": "Senam Jari Konsentrasi (Brain Gym)",
+    "duration_minutes": 3,
+    "energy_level": "High",
+    "description": "Siswa diajak meniru gerakan senam jari guru dengan pola berlawanan antara tangan kanan dan kiri (misal: tangan kanan acungkan jempol, tangan kiri acungkan kelingking, lalu bertukar cepat).",
+    "kegunaan": "Merangsang koordinasi otak kanan dan kiri, memulihkan fokus mental sebelum pengerjaan ujian/latihan rumit."
+  }
+]

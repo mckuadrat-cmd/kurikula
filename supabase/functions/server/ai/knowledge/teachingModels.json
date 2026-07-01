@@ -1,0 +1,58 @@
+{
+  "PBL": {
+    "name": "Problem Based Learning (PBL)",
+    "description": "Model pembelajaran yang menyajikan masalah kontekstual sebagai fokus pembelajaran untuk mengembangkan kemampuan berpikir kritis dan pemecahan masalah.",
+    "kapan_cocok_digunakan": "Saat mempelajari konsep yang membutuhkan aplikasi pemecahan masalah nyata, materi dengan isu sosial/lingkungan, atau konsep multidisiplin.",
+    "kelebihan": "Meningkatkan kemampuan pemecahan masalah, motivasi belajar mandiri, dan kerja sama tim.",
+    "kekurangan": "Memerlukan waktu yang cukup panjang untuk eksplorasi dan persiapan kasus masalah yang berkualitas.",
+    "ukuran_kelas_yang_cocok": "Kecil hingga Menengah (15-30 siswa)"
+  },
+  "ProjectBasedLearning": {
+    "name": "Project Based Learning (PjBL)",
+    "description": "Model pembelajaran yang berpusat pada siswa untuk melakukan investigasi mendalam terhadap suatu topik melalui penyusunan sebuah proyek/produk nyata.",
+    "kapan_cocok_digunakan": "Untuk materi praktek, aplikasi akhir kompetensi, integrasi lintas bidang studi, dan penguatan karakter kolaborasi serta kreativitas.",
+    "kelebihan": "Menghasilkan produk nyata, melatih manajemen proyek, kolaboratif, dan relevan dengan dunia kerja.",
+    "kekurangan": "Membutuhkan alokasi sumber daya/biaya, waktu pengerjaan yang lama, dan pengawasan ekstra dari guru.",
+    "ukuran_kelas_yang_cocok": "Menengah (20-35 siswa)"
+  },
+  "DiscoveryLearning": {
+    "name": "Discovery Learning",
+    "description": "Model pembelajaran kognitif yang menuntut guru kreatif menciptakan situasi belajar yang membuat siswa belajar mandiri menemukan konsep atau prinsip.",
+    "kapan_cocok_digunakan": "Saat mempelajari teori sains dasar, pola matematika, tata bahasa, atau prinsip yang bisa diinduksi dari contoh.",
+    "kelebihan": "Melatih keterampilan kognitif siswa, memperkuat retensi ingatan karena siswa menemukan prinsip itu sendiri.",
+    "kekurangan": "Bisa menimbulkan frustrasi bagi siswa berkemampuan rendah jika bimbingan guru kurang intensif.",
+    "ukuran_kelas_yang_cocok": "Kecil hingga Menengah (10-25 siswa)"
+  },
+  "InquiryLearning": {
+    "name": "Inquiry Learning",
+    "description": "Model pembelajaran yang menekankan pada proses berpikir kritis dan analitis untuk mencari dan menemukan sendiri jawaban dari suatu masalah yang dipertanyakan melalui penyelidikan ilmiah.",
+    "kapan_cocok_digunakan": "Pada pembelajaran IPA/Sains praktikum, pengujian hipotesis, dan topik penelitian sosial.",
+    "kelebihan": "Menumbuhkan sikap ilmiah, melatih pemikiran logis, dan mendorong rasa ingin tahu yang tinggi.",
+    "kekurangan": "Sulit diterapkan pada materi yang terlalu abstrak atau kelas dengan disiplin yang rendah.",
+    "ukuran_kelas_yang_cocok": "Kecil hingga Menengah (15-30 siswa)"
+  },
+  "ThinkPairShare": {
+    "name": "Think Pair Share (TPS)",
+    "description": "Model pembelajaran kooperatif sederhana di mana siswa berpikir mandiri tentang suatu pertanyaan (Think), berdiskusi berpasangan (Pair), lalu membagikannya ke kelas (Share).",
+    "kapan_cocok_digunakan": "Sesi diskusi singkat di kelas, review materi pasca ceramah, merangsang partisipasi siswa pasif/pendiam.",
+    "kelebihan": "Semua siswa mendapatkan kesempatan berbicara, waktu persiapan minimal, melatih keberanian berpendapat.",
+    "kekurangan": "Diskusi berpasangan bisa melebar jika guru tidak memantau kelompok dengan baik.",
+    "ukuran_kelas_yang_cocok": "Semua Ukuran Kelas (Kecil, Menengah, Besar)"
+  },
+  "Jigsaw": {
+    "name": "Jigsaw",
+    "description": "Model pembelajaran kooperatif di mana siswa dibagi menjadi kelompok asal dan kelompok ahli untuk mendalami sub-materi tertentu lalu saling mengajarkan.",
+    "kapan_cocok_digunakan": "Materi membaca yang panjang, pengelompokan sub-topik sejarah/sosial, atau materi geografi.",
+    "kelebihan": "Meningkatkan rasa tanggung jawab individu, mengurangi dominasi satu siswa, menghemat waktu penyampaian materi luas.",
+    "kekurangan": "Jika ada siswa yang tidak aktif di kelompok ahli, informasi yang didapatkan kelompok asal menjadi tidak lengkap.",
+    "ukuran_kelas_yang_cocok": "Menengah hingga Besar (24-40 siswa)"
+  },
+  "GalleryWalk": {
+    "name": "Gallery Walk",
+    "description": "Model pembelajaran aktif di mana kelompok siswa menempelkan karya/poster mereka di dinding kelas, lalu kelompok lain berkeliling memberikan umpan balik layaknya pameran seni.",
+    "kapan_cocok_digunakan": "Tahap presentasi hasil diskusi/proyek kelompok, sintesis akhir modul, pembelajaran visual.",
+    "kelebihan": "Mendorong aktivitas fisik siswa (kinestetik), menghemat waktu presentasi satu per satu di depan kelas, melatih evaluasi teman sejawat.",
+    "kekurangan": "Bisa menimbulkan keributan di kelas jika tidak diarahkan dengan instruksi perputaran kelompok yang jelas.",
+    "ukuran_kelas_yang_cocok": "Menengah hingga Besar (20-40 siswa)"
+  }
+}

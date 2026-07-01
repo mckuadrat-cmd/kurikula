@@ -1,0 +1,17 @@
+{
+  "diferensiasi_konten": {
+    "support_learner": "Sediakan ringkasan materi dengan kosakata sederhana, glosarium, bantuan audio/visual, dan peta konsep dasar.",
+    "regular_learner": "Gunakan buku teks standar, artikel populer, dan modul ajar reguler dengan tingkat kompleksitas menengah.",
+    "fast_learner": "Berikan bahan bacaan tambahan yang lebih mendalam, studi kasus kompleks, jurnal ilmiah populer, atau artikel bahasa Inggris (jika relevan)."
+  },
+  "diferensiasi_proses": {
+    "support_learner": "Gunakan perancah (scaffolding) terstruktur, demonstrasi langkah demi langkah, pendampingan kelompok kecil oleh guru (guided session), atau tutor sebaya.",
+    "regular_learner": "Bekerja mandiri dalam kelompok kolaboratif dengan panduan LKPD standar dan intervensi guru secara berkala.",
+    "fast_learner": "Pemberian tugas mandiri bersifat eksploratif (open-ended task), membimbing teman (tutor sebaya), atau merancang jalur penyelidikan sendiri."
+  },
+  "diferensiasi_produk": {
+    "support_learner": "Siswa boleh menyajikan pemahaman melalui format yang lebih sederhana (jawaban lisan, diagram berlabel, rekaman suara singkat, atau pilihan isian terpandu).",
+    "regular_learner": "Siswa membuat laporan tertulis standar, presentasi slide kelompok, atau infografis materi.",
+    "fast_learner": "Siswa didorong membuat produk orisinal (prototipe kerja, video penjelasan komprehensif, pementasan drama singkat, analisis solusi masalah nyata, atau esai argumentatif)."
+  }
+}
