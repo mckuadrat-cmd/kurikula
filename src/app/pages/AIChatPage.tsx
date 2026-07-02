@@ -70,14 +70,14 @@ function renderSimpleMarkdown(text: string) {
     } else if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
       const content = line.trim().replace(/^[\-\*]\s+/, "");
       elements.push(
-        <ul key={i} className="list-disc list-inside ml-2 my-0.5 text-gray-700 text-xs">
+        <ul key={i} className="list-disc list-inside ml-2 my-0.5 text-gray-700 text-sm">
           <li>{parseInlineMarkdown(content)}</li>
         </ul>
       );
     } else if (/^\d+\.\s+/.test(line.trim())) {
       const content = line.trim().replace(/^\d+\.\s+/, "");
       elements.push(
-        <ol key={i} className="list-decimal list-inside ml-2 my-0.5 text-gray-700 text-xs">
+        <ol key={i} className="list-decimal list-inside ml-2 my-0.5 text-gray-700 text-sm">
           <li>{parseInlineMarkdown(content)}</li>
         </ol>
       );
@@ -86,7 +86,7 @@ function renderSimpleMarkdown(text: string) {
     } else if (!line.trim()) {
       elements.push(<div key={i} className="h-1.5" />);
     } else {
-      elements.push(<p key={i} className="text-xs text-gray-700 my-0.5 leading-relaxed">{parseInlineMarkdown(line)}</p>);
+      elements.push(<p key={i} className="text-sm text-gray-700 my-0.5 leading-relaxed">{parseInlineMarkdown(line)}</p>);
     }
     
     i++;
@@ -117,7 +117,7 @@ function parseMarkdownTable(tableLines: string[], keyIndex: number) {
         <thead className="bg-gray-50">
           <tr>
             {headers.map((h, idx) => (
-              <th key={idx} className="px-2 py-1 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider border-r border-gray-250">
+              <th key={idx} className="px-2 py-1 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-250">
                 {h}
               </th>
             ))}
@@ -127,7 +127,7 @@ function parseMarkdownTable(tableLines: string[], keyIndex: number) {
           {rows.map((row, rIdx) => (
             <tr key={rIdx}>
               {row.map((cell, cIdx) => (
-                <td key={cIdx} className="px-2 py-1 text-[10px] text-gray-900 whitespace-pre-wrap border-r border-gray-250">
+                <td key={cIdx} className="px-2 py-1 text-xs text-gray-900 whitespace-pre-wrap border-r border-gray-250">
                   {parseInlineMarkdown(cell)}
                 </td>
               ))}
@@ -300,7 +300,7 @@ export default function AIChatPage() {
           {
             id: "greeting",
             role: "assistant",
-            content: `Halo Guru ${profile.name || ""}! Silakan ajukan pertanyaan Anda.`
+            content: `Halo Guru ${profile?.name || ""}! Silakan ajukan pertanyaan Anda.`
           }
         ]);
       }
@@ -698,7 +698,7 @@ export default function AIChatPage() {
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] p-4 rounded-[20px] text-xs leading-relaxed shadow-sm ${
+                    className={`max-w-[80%] p-4 rounded-[20px] text-sm leading-relaxed shadow-sm ${
                       isUser
                         ? "bg-[#3C405B] text-white rounded-tr-none font-medium"
                         : "bg-white text-slate-800 border border-slate-105 rounded-tl-none prose prose-slate max-w-[80%]"
@@ -708,7 +708,7 @@ export default function AIChatPage() {
                   </div>
                   {isUser && (
                     <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-750 text-xs font-bold shadow flex-shrink-0">
-                      {profile?.name ? profile.name.slice(0, 2).toUpperCase() : <User className="w-4 h-4" />}
+                      {profile?.name ? profile?.name.slice(0, 2).toUpperCase() : <User className="w-4 h-4" />}
                     </div>
                   )}
                 </div>
@@ -764,7 +764,7 @@ export default function AIChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSend()}
                 placeholder={isLocked ? "Fitur terkunci. Silakan berlangganan..." : isTyping ? "Sedang memikirkan solusi..." : "Tuliskan pertanyaan seputar rancangan belajar, diferensiasi, atau manajemen kelas..."}
-                className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-[16px] text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-semibold shadow-inner"
+                className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-[16px] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-semibold shadow-inner"
               />
               <button
                 onClick={() => handleSend()}
