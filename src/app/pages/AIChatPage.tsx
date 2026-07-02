@@ -38,14 +38,14 @@ function parseInlineMarkdown(text: string) {
 
 function renderSimpleMarkdown(text: string) {
   if (!text) return null;
-  
+
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
-  
+
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    
+
     if (line.trim().startsWith("|")) {
       const nextLine = lines[i + 1];
       if (nextLine && nextLine.trim().startsWith("|") && (nextLine.includes("---") || nextLine.includes(":-"))) {
@@ -58,7 +58,7 @@ function renderSimpleMarkdown(text: string) {
         continue;
       }
     }
-    
+
     if (line.startsWith("### ")) {
       elements.push(<h3 key={i} className="text-sm font-bold text-gray-900 mt-2 mb-1">{line.replace("### ", "")}</h3>);
     } else if (line.startsWith("#### ")) {
@@ -88,29 +88,29 @@ function renderSimpleMarkdown(text: string) {
     } else {
       elements.push(<p key={i} className="text-sm text-gray-700 my-0.5 leading-relaxed">{parseInlineMarkdown(line)}</p>);
     }
-    
+
     i++;
   }
-  
+
   return elements;
 }
 
 function parseMarkdownTable(tableLines: string[], keyIndex: number) {
   const contentLines = tableLines.filter(line => !line.includes("---") && !line.includes(":-"));
   if (contentLines.length === 0) return null;
-  
+
   const headers = contentLines[0]
     .split("|")
     .map(cell => cell.trim())
     .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-    
+
   const rows = contentLines.slice(1).map(line => {
     return line
       .split("|")
       .map(cell => cell.trim())
       .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
   });
-  
+
   return (
     <div key={`table-${keyIndex}`} className="overflow-x-auto my-2 rounded-[8px] border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200 border-collapse border-slate-200">
@@ -166,17 +166,17 @@ export default function AIChatPage() {
   const { subscriptionTier, credits, activeWorkspaceId, refresh, aiModels } = useWorkspace();
   const { profile } = useAuth();
   const navigate = useNavigate();
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // UI states
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>(
     localStorage.getItem("kurikula_selected_ai_model") || "gemini-flash"
   );
-  
+
   const isLocked = subscriptionTier === "inactive";
-  
+
   // Chat states
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -193,7 +193,7 @@ export default function AIChatPage() {
       const cleanTier = (subscriptionTier || "inactive").toLowerCase();
       const allowedTiers = currentModelObj.tier_restriction.map((t: string) => t.toLowerCase());
       if (!allowedTiers.includes(cleanTier)) {
-        const firstAllowed = aiModels.find(m => 
+        const firstAllowed = aiModels.find(m =>
           m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier)
         );
         if (firstAllowed) {
@@ -243,7 +243,7 @@ export default function AIChatPage() {
     try {
       const timeStr = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       const title = `Percakapan Baru - ${timeStr}`;
-      
+
       const { data: newConv, error } = await supabase
         .from("ai_conversations")
         .insert({
@@ -262,10 +262,10 @@ export default function AIChatPage() {
         {
           id: "greeting",
           role: "assistant",
-          content: `Halo Guru ${profile.name || ""}! Saya adalah Asisten Guru AI. Silakan tanyakan apa saja seputar rancangan pembelajaran, aktivitas kelas, asesmen, atau diferensiasi siswa.`
+          content: `Hai ${profile.name || ""}! Saya adalah Asisten Kurikula. Hal apa yang ingin anda diskusikan hari ini ?.`
         }
       ]);
-      
+
       if (!isInitial) {
         toast.success("Percakapan baru dimulai");
       }
@@ -300,7 +300,7 @@ export default function AIChatPage() {
           {
             id: "greeting",
             role: "assistant",
-            content: `Halo Guru ${profile?.name || ""}! Silakan ajukan pertanyaan Anda.`
+            content: `Hai ${profile?.name || ""}! Silakan ajukan pertanyaan Anda.`
           }
         ]);
       }
@@ -324,7 +324,7 @@ export default function AIChatPage() {
       if (error) throw error;
 
       setConversations(prev => prev.filter(c => c.id !== convId));
-      
+
       if (activeConversationId === convId) {
         const remaining = conversations.filter(c => c.id !== convId);
         if (remaining.length > 0) {
@@ -568,11 +568,10 @@ export default function AIChatPage() {
                   <div
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv.id)}
-                    className={`group p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-slate-350 hover:shadow ${
-                      activeConversationId === conv.id
+                    className={`group p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-slate-350 hover:shadow ${activeConversationId === conv.id
                         ? "border-indigo-500 ring-2 ring-indigo-500/10 bg-indigo-50/5"
                         : "border-slate-150"
-                    }`}
+                      }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-slate-800 truncate">{conv.title}</p>
@@ -637,7 +636,7 @@ export default function AIChatPage() {
                 <Sparkles className="w-4.5 h-4.5 text-white animate-pulse" />
               </div>
               <div>
-                <h2 className="font-extrabold text-slate-800 text-sm">Tanya Asisten Guru</h2>
+                <h2 className="font-extrabold text-slate-800 text-sm">Kurikula Chat</h2>
                 <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
                   <span>Aktif: {aiModels.find(m => m.id === selectedModel)?.name || "Gemini Flash"}</span>
                 </p>
@@ -698,11 +697,10 @@ export default function AIChatPage() {
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] p-4 rounded-[20px] text-sm leading-relaxed shadow-sm ${
-                      isUser
+                    className={`max-w-[80%] p-4 rounded-[20px] text-sm leading-relaxed shadow-sm ${isUser
                         ? "bg-[#3C405B] text-white rounded-tr-none font-medium"
                         : "bg-white text-slate-800 border border-slate-105 rounded-tl-none prose prose-slate max-w-[80%]"
-                    }`}
+                      }`}
                   >
                     {isUser ? message.content : renderSimpleMarkdown(message.content)}
                   </div>
@@ -727,7 +725,7 @@ export default function AIChatPage() {
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
         </div>
@@ -774,7 +772,7 @@ export default function AIChatPage() {
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-400 text-center">
               <Info className="w-3 h-3 text-indigo-500" />
               <span>Setiap respon menggunakan AI credit sesuai tarif model yang aktif.</span>

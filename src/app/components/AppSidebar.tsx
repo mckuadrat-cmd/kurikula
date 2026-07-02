@@ -83,7 +83,7 @@ export function AppSidebar() {
     ...(isSuperAdmin ? [{ icon: ShieldCheck, label: "User Management", path: "/admin" }] : []),
     ...(isSchoolAdmin ? [{ icon: School, label: "Dashboard Sekolah", path: "/school-admin" }] : []),
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-    { icon: MessageCircle, label: "Tanya Guru AI", path: "/ai-chat", isAI: true },
+    { icon: MessageCircle, label: "Kurikula Chat", path: "/ai-chat", isAI: true },
     { icon: Users, label: "Data Siswa", path: "/students" },
     { icon: QrCode, label: "Absensi", path: "/attendance" },
     { icon: Calendar, label: "Rencana Semester", path: "/semester-planner", isAI: true },

@@ -26,14 +26,14 @@ function parseInlineMarkdown(text: string) {
 
 function renderSimpleMarkdown(text: string) {
   if (!text) return null;
-  
+
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
-  
+
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    
+
     // Check if line is part of a markdown table
     if (line.trim().startsWith("|")) {
       // Look ahead to see if it has a divider line
@@ -45,13 +45,13 @@ function renderSimpleMarkdown(text: string) {
           tableLines.push(lines[i]);
           i++;
         }
-        
+
         // Parse the table
         elements.push(parseMarkdownTable(tableLines, elements.length));
         continue;
       }
     }
-    
+
     // Standard rendering
     if (line.startsWith("### ")) {
       elements.push(<h3 key={i} className="text-sm font-bold text-gray-900 mt-2 mb-1">{line.replace("### ", "")}</h3>);
@@ -82,31 +82,31 @@ function renderSimpleMarkdown(text: string) {
     } else {
       elements.push(<p key={i} className="text-xs text-gray-700 my-0.5 leading-relaxed">{parseInlineMarkdown(line)}</p>);
     }
-    
+
     i++;
   }
-  
+
   return elements;
 }
 
 function parseMarkdownTable(tableLines: string[], keyIndex: number) {
   // Filter out divider lines (e.g. |---|---|)
   const contentLines = tableLines.filter(line => !line.includes("---") && !line.includes(":-"));
-  
+
   if (contentLines.length === 0) return null;
-  
+
   const headers = contentLines[0]
     .split("|")
     .map(cell => cell.trim())
     .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1); // Remove empty ends
-    
+
   const rows = contentLines.slice(1).map(line => {
     return line
       .split("|")
       .map(cell => cell.trim())
       .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
   });
-  
+
   return (
     <div key={`table-${keyIndex}`} className="overflow-x-auto my-2 rounded-[8px] border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200 border-collapse border-slate-200">
@@ -210,7 +210,7 @@ export function AIChatPanel() {
   // Enforce tier-based locks in local state
   useEffect(() => {
     if (!aiModels || aiModels.length === 0) return;
-    
+
     // Cek apakah model terpilih valid untuk tier saat ini
     const currentModelObj = aiModels.find(m => m.id === selectedModel);
     if (currentModelObj) {
@@ -219,7 +219,7 @@ export function AIChatPanel() {
       if (!allowedTiers.includes(cleanTier)) {
         // Model tidak boleh digunakan untuk tier saat ini! 
         // Cari model pertama yang diperbolehkan
-        const firstAllowed = aiModels.find(m => 
+        const firstAllowed = aiModels.find(m =>
           m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier)
         );
         if (firstAllowed) {
@@ -287,7 +287,7 @@ export function AIChatPanel() {
         }
 
         setActiveConversationId(activeConv.id);
-        
+
         // Fetch messages for active conversation
         const { data: msgs, error: msgsErr } = await supabase
           .from("ai_messages")
@@ -296,7 +296,7 @@ export function AIChatPanel() {
           .order("created_at", { ascending: true });
 
         if (msgsErr) throw msgsErr;
-        
+
         if (msgs && msgs.length > 0) {
           setMessages(msgs.map(m => ({
             id: m.id,
@@ -310,11 +310,11 @@ export function AIChatPanel() {
             {
               id: "greeting",
               role: "assistant",
-              content: `Halo Guru ${profile.name || ""}! Saya adalah Asisten Guru khusus untuk halaman **${contextInfo.title}**. Saya siap membantu Anda merancang aktivitas, diferensiasi, mereview konten, maupun mengatasi masalah belajar di kelas ini.`
+              content: `Hai ${profile?.name || ""}! Saya adalah asisten kurikula khusus untuk halaman **${contextInfo.title}**. Saya siap membantu Anda merancang aktivitas, diferensiasi, mereview konten, maupun mengatasi masalah belajar di kelas ini.`
             }
           ]);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Gagal sinkronisasi chat history:", err);
         toast.error("Gagal memuat riwayat obrolan.");
       } finally {
@@ -331,7 +331,7 @@ export function AIChatPanel() {
     try {
       const timeStr = new Date().toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' });
       const title = `Percakapan Baru - ${timeStr}`;
-      
+
       const { data: newConv, error } = await supabase
         .from("ai_conversations")
         .insert({
@@ -350,7 +350,7 @@ export function AIChatPanel() {
         {
           id: "greeting",
           role: "assistant",
-          content: `Halo Guru ${profile.name || ""}! Saya memulai obrolan baru untuk halaman **${contextInfo.title}**. Silakan ajukan pertanyaan atau pilih salah satu menu cepat di bawah ini.`
+          content: `Hai ${profile.name || ""}! Saya memulai obrolan baru untuk halaman **${contextInfo.title}**. Silakan ajukan pertanyaan atau pilih salah satu menu cepat di bawah ini.`
         }
       ]);
       setShowHistory(false);
@@ -387,7 +387,7 @@ export function AIChatPanel() {
           {
             id: "greeting",
             role: "assistant",
-            content: `Halo Guru ${profile.name || ""}! Saya adalah Asisten Guru khusus untuk halaman **${contextInfo.title}**.`
+            content: `Hai ${profile?.name || ""}! Saya adalah asisten kurikula khusus untuk halaman **${contextInfo.title}**.`
           }
         ]);
       }
@@ -401,6 +401,7 @@ export function AIChatPanel() {
 
   // Hapus percakapan
   const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
+    if (!profile?.id) return;
     e.stopPropagation(); // Biar tidak trigger handleSelectConversation
     try {
       const { error } = await supabase
@@ -411,7 +412,7 @@ export function AIChatPanel() {
       if (error) throw error;
 
       setConversations(prev => prev.filter(c => c.id !== convId));
-      
+
       // Jika yang dihapus sedang aktif
       if (activeConversationId === convId) {
         const remaining = conversations.filter(c => c.id !== convId);
@@ -436,7 +437,7 @@ export function AIChatPanel() {
               {
                 id: "greeting",
                 role: "assistant",
-                content: `Halo Guru ${profile.name || ""}! Saya adalah Asisten Guru khusus untuk halaman **${contextInfo.title}**.`
+                content: `Hai ${profile?.name || ""}! Saya adalah asisten kurikula khusus untuk halaman **${contextInfo.title}**.`
               }
             ]);
           }
@@ -649,7 +650,7 @@ export function AIChatPanel() {
                     <Sparkles className="w-4 h-4 text-white animate-pulse" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">Asisten Guru AI</h3>
+                    <h3 className="font-bold text-gray-900 text-sm">Kurikula Chat</h3>
                     <p className="text-xs text-[#DF7A5E] font-extrabold flex items-center gap-1">
                       <span>Saldo: {(credits?.balance ?? 0).toLocaleString("id-ID")} Credit</span>
                       <span className="text-gray-400">•</span>
@@ -754,11 +755,10 @@ export function AIChatPanel() {
                       <div
                         key={conv.id}
                         onClick={() => handleSelectConversation(conv)}
-                        className={`p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-gray-300 hover:shadow ${
-                          activeConversationId === conv.id
-                            ? "border-indigo-500 ring-1 ring-indigo-500/50 bg-indigo-50/10"
-                            : "border-gray-150"
-                        }`}
+                        className={`p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-gray-300 hover:shadow ${activeConversationId === conv.id
+                          ? "border-indigo-500 ring-1 ring-indigo-500/50 bg-indigo-50/10"
+                          : "border-gray-150"
+                          }`}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-bold text-gray-950 truncate flex items-center gap-1.5">
@@ -796,11 +796,10 @@ export function AIChatPanel() {
                     className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[87%] p-3 rounded-[16px] text-xs leading-relaxed shadow-sm ${
-                        message.role === "user"
-                          ? "bg-[#3C405B] text-white rounded-br-none"
-                          : "bg-white text-gray-900 border border-gray-100 rounded-bl-none prose prose-slate max-w-[87%]"
-                      }`}
+                      className={`max-w-[87%] p-3 rounded-[16px] text-xs leading-relaxed shadow-sm ${message.role === "user"
+                        ? "bg-[#3C405B] text-white rounded-br-none"
+                        : "bg-white text-gray-900 border border-gray-100 rounded-bl-none prose prose-slate max-w-[87%]"
+                        }`}
                     >
                       {message.role === "user" ? message.content : renderSimpleMarkdown(message.content)}
                     </div>
@@ -817,7 +816,7 @@ export function AIChatPanel() {
                   </div>
                 </div>
               )}
-              
+
               <div ref={messagesEndRef} />
             </div>
 
