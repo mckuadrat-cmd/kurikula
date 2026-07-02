@@ -95,7 +95,7 @@ export default function Root() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 py-0 md:py-4 md:pr-4 md:pl-2 bg-white h-full relative">
         <div id="main-content-wrapper" className={`flex-1 bg-[#F4F6F9] md:rounded-[32px] flex flex-col shadow-inner ${
-          location.pathname === "/ai-planner" || location.pathname === "/ai-materials"
+          location.pathname === "/ai-planner" || location.pathname === "/ai-materials" || location.pathname === "/ai-chat"
             ? "overflow-y-auto lg:overflow-hidden"
             : "overflow-y-auto"
         }`}>

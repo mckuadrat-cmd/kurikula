@@ -86,9 +86,47 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
     }
 
     // 4. Validasi Tier & Model AI yang dipilih
-    const tierValidation = CreditCalculator.validateTierAndModel(ws.subscription_tier, model);
-    if (!tierValidation.allowed) {
-      return c.json({ error: tierValidation.reason }, 403);
+    let activeModelObj = null;
+    try {
+      const { data: dbModel } = await supabase
+        .from("ai_models")
+        .select("*")
+        .eq("id", model)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (dbModel) {
+        activeModelObj = dbModel;
+      }
+    } catch {
+      // Ignore database query error and fallback
+    }
+
+    // Jika tidak ditemukan di DB, gunakan hardcoded fallback
+    if (!activeModelObj) {
+      const fallbackModels: Record<string, any> = {
+        "gemini-flash": {
+          id: "gemini-flash",
+          name: "Gemini 2.5 Flash",
+          api_string: "gemini-2.5-flash",
+          multiplier: 1,
+          tier_restriction: ["basic", "pro", "premium", "school", "trial"]
+        },
+        "gemini-pro": {
+          id: "gemini-pro",
+          name: "Gemini 2.5 Pro",
+          api_string: "gemini-2.5-pro",
+          multiplier: 2,
+          tier_restriction: ["pro", "premium", "school", "trial"]
+        }
+      };
+      activeModelObj = fallbackModels[model] || fallbackModels["gemini-flash"];
+    }
+
+    // Validasi Tier
+    const cleanTier = (ws.subscription_tier || "inactive").toLowerCase();
+    const isTierAllowed = activeModelObj.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier);
+    if (!isTierAllowed) {
+      return c.json({ error: `Model ini hanya tersedia untuk pengguna paket ${activeModelObj.tier_restriction.join(", ")}.` }, 403);
     }
 
     // 5. Cek sisa credit cukup
@@ -99,7 +137,7 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
       .maybeSingle();
 
     const balance = credit?.balance ?? 0;
-    const cost = CreditCalculator.getCreditCost(type, model);
+    const cost = CreditCalculator.getCreditCost(type, model, activeModelObj.multiplier);
 
     if (balance < cost) {
       return c.json({ error: `AI Credit tidak cukup. Estimasi biaya ${cost} credit, saldo Anda ${balance} credit. Silakan top up atau upgrade paket.` }, 400);
@@ -178,7 +216,7 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
       }
     }
 
-    const targetModel = model === "gemini-pro" ? "gemini-2.5-pro" : "gemini-2.5-flash";
+    const targetModel = activeModelObj ? activeModelObj.api_string : (model === "gemini-pro" ? "gemini-2.5-pro" : "gemini-2.5-flash");
 
     // Panggil Gemini
     let response = await fetch(
@@ -201,13 +239,21 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
         type: type,
         model: model || "gemini-flash",
         credit_cost: 0,
-        status: "failed"
+        status: "failed",
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        estimated_cost_idr: 0
       });
       return c.json({ error: `AI gagal memproses (Gemini API error). Credit tidak dipotong. Silakan coba lagi. Detail: ${errorText}` }, response.status);
     }
 
     let data = await response.json();
     let generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // Track tokens
+    let totalPromptTokens = data.usageMetadata?.promptTokenCount || 0;
+    let totalCompletionTokens = data.usageMetadata?.candidatesTokenCount || 0;
 
     // 6. Validasi output (bukan chat)
     if (type !== "chat") {
@@ -246,6 +292,11 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
         if (retryResponse.ok) {
           const retryData = await retryResponse.json();
           const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          
+          // Accumulate tokens for retry
+          totalPromptTokens += retryData.usageMetadata?.promptTokenCount || 0;
+          totalCompletionTokens += retryData.usageMetadata?.candidatesTokenCount || 0;
+
           const secondValidation = OutputValidator.validate(type, retryText);
           
           if (secondValidation.valid) {
@@ -258,7 +309,11 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
               type: type,
               model: model || "gemini-flash",
               credit_cost: 0,
-              status: "failed"
+              status: "failed",
+              prompt_tokens: totalPromptTokens,
+              completion_tokens: totalCompletionTokens,
+              total_tokens: totalPromptTokens + totalCompletionTokens,
+              estimated_cost_idr: 0
             });
             return c.json({ error: `Hasil AI tidak lengkap setelah 2 kali percobaan (Missing: ${secondValidation.missingParts.join(", ")}). Credit tidak dipotong. Silakan lengkapi data input dan coba lagi.` }, 422);
           }
@@ -270,12 +325,26 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
             type: type,
             model: model || "gemini-flash",
             credit_cost: 0,
-            status: "failed"
+            status: "failed",
+            prompt_tokens: totalPromptTokens,
+            completion_tokens: totalCompletionTokens,
+            total_tokens: totalPromptTokens + totalCompletionTokens,
+            estimated_cost_idr: 0
           });
           return c.json({ error: "Percobaan perbaikan AI gagal (Gemini API error). Credit tidak dipotong. Silakan coba lagi." }, 500);
         }
       }
     }
+
+    // Calculate real cost in IDR based on model pricing
+    // Pro: $1.25 / 1M input, $5.00 / 1M output
+    // Flash: $0.075 / 1M input, $0.30 / 1M output
+    const isProAPI = targetModel.includes("pro");
+    const inputPrice = isProAPI ? 1.25 : 0.075;
+    const outputPrice = isProAPI ? 5.00 : 0.30;
+    const costUsd = ((totalPromptTokens * inputPrice) + (totalCompletionTokens * outputPrice)) / 1000000;
+    const exchangeRate = 16300; // Rp 16.300
+    const estimatedCostIdr = costUsd * exchangeRate;
 
     // 7. Potong credit di database
     const newBalance = balance - cost;
@@ -299,7 +368,11 @@ app.post("/make-server-84c63b2a/generate-ai", async (c) => {
       type: type,
       model: model || "gemini-flash",
       credit_cost: cost,
-      status: "success"
+      status: "success",
+      prompt_tokens: totalPromptTokens,
+      completion_tokens: totalCompletionTokens,
+      total_tokens: totalPromptTokens + totalCompletionTokens,
+      estimated_cost_idr: Number(estimatedCostIdr.toFixed(4))
     });
 
     return c.json({ content: generatedText });
@@ -619,6 +692,188 @@ app.get("/make-server-84c63b2a/admin/users", async (c) => {
     });
 
     return c.json({ users: mappedUsers });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// GET /admin/ai-usage - Mendapatkan log penggunaan AI credit beserta estimasi biaya real Gemini
+app.get("/make-server-84c63b2a/admin/ai-usage", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) {
+    return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const { data: usage, error: usageErr } = await supabase
+      .from("ai_credit_usage")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (usageErr) throw usageErr;
+
+    const { data: { users }, error: authErr } = await supabase.auth.admin.listUsers();
+    if (authErr) throw authErr;
+
+    const { data: workspaces, error: wsErr } = await supabase
+      .from("workspaces")
+      .select("id, name");
+    if (wsErr) throw wsErr;
+
+    const mappedUsage = (usage ?? []).map((u: any) => {
+      const user = users.find((usr: any) => usr.id === u.user_id);
+      const ws = workspaces.find((w: any) => w.id === u.workspace_id);
+      return {
+        id: u.id,
+        created_at: u.created_at,
+        type: u.type,
+        model: u.model,
+        credit_cost: u.credit_cost,
+        status: u.status,
+        prompt_tokens: u.prompt_tokens || 0,
+        completion_tokens: u.completion_tokens || 0,
+        total_tokens: u.total_tokens || 0,
+        estimated_cost_idr: u.estimated_cost_idr || 0,
+        user_email: user?.email || "Unknown User",
+        user_name: user?.user_metadata?.name || user?.email || "Unknown User",
+        workspace_name: ws?.name || "Unknown Workspace"
+      };
+    });
+
+    return c.json({ usage: mappedUsage });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// GET /admin/ai-models - Mendapatkan daftar semua AI Model
+app.get("/make-server-84c63b2a/admin/ai-models", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const { data, error } = await supabase
+      .from("ai_models")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      // Jika tabel belum di-migrate, kirim list kosong
+      return c.json({ models: [], is_migrated: false });
+    }
+
+    return c.json({ models: data, is_migrated: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// POST /admin/ai-models - Menambah AI Model baru
+app.post("/make-server-84c63b2a/admin/ai-models", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const body = await c.req.json();
+    const { id, name, api_string, multiplier, is_active, tier_restriction } = body;
+
+    if (!id || !name || !api_string) {
+      return c.json({ error: "ID, Nama, dan API String wajib diisi." }, 400);
+    }
+
+    const { data, error } = await supabase
+      .from("ai_models")
+      .insert({
+        id: id.trim().toLowerCase(),
+        name: name.trim(),
+        api_string: api_string.trim(),
+        multiplier: Number(multiplier) || 1,
+        is_active: is_active !== false,
+        tier_restriction: Array.isArray(tier_restriction) ? tier_restriction : [],
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return c.json({ model: data });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// PUT /admin/ai-models/:id - Memperbarui AI Model
+app.put("/make-server-84c63b2a/admin/ai-models/:id", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+  const modelId = c.req.param("id");
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const body = await c.req.json();
+    const { name, api_string, multiplier, is_active, tier_restriction } = body;
+
+    const { data, error } = await supabase
+      .from("ai_models")
+      .update({
+        name: name?.trim(),
+        api_string: api_string?.trim(),
+        multiplier: multiplier !== undefined ? Number(multiplier) : undefined,
+        is_active: is_active !== undefined ? is_active : undefined,
+        tier_restriction: Array.isArray(tier_restriction) ? tier_restriction : undefined,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", modelId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return c.json({ model: data });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// DELETE /admin/ai-models/:id - Menghapus AI Model
+app.delete("/make-server-84c63b2a/admin/ai-models/:id", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+  const modelId = c.req.param("id");
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const { error } = await supabase
+      .from("ai_models")
+      .delete()
+      .eq("id", modelId);
+
+    if (error) throw error;
+
+    return c.json({ success: true, message: "Model berhasil dihapus." });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

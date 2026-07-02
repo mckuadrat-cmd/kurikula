@@ -23,6 +23,7 @@ type Ctx = {
   subscriptionTier: string;
   subscriptionExpiresAt: Date | null;
   latestSubscriptionTrx: any | null;
+  aiModels: any[];
   setSubscriptionTier: (tier: string) => void;
   refresh: () => Promise<void>;
   switchWorkspace: (id: string) => Promise<void>;
@@ -36,6 +37,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [credits, setCredits] = useState<Credits | null>(null);
   const [latestSubscriptionTrx, setLatestSubscriptionTrx] = useState<any | null>(null);
   const [subscriptionTierOverride, setTierOverride] = useState<string | null>(null);
+  const [aiModels, setAiModels] = useState<any[]>([]);
 
   const activeWorkspace = useMemo(() => {
     return workspaces.find((w) => w.id === activeWorkspaceId) || null;
@@ -101,6 +103,33 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setCredits(null);
       setLatestSubscriptionTrx(null);
     }
+
+    // Fetch AI Models
+    try {
+      const { data, error } = await supabase
+        .from("ai_models")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+      if (!error && data && data.length > 0) {
+        setAiModels(data);
+      } else {
+        // Fallback models
+        setAiModels([
+          { id: "gemini-flash", name: "Gemini 2.5 Flash", api_string: "gemini-2.5-flash", multiplier: 1, tier_restriction: ["basic", "pro", "premium", "school", "trial"] },
+          { id: "gemini-pro", name: "Gemini 2.5 Pro", api_string: "gemini-2.5-pro", multiplier: 2, tier_restriction: ["pro", "premium", "school", "trial"] },
+          { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", api_string: "gemini-3.5-flash", multiplier: 1, tier_restriction: ["basic", "pro", "premium", "school", "trial"] },
+          { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", api_string: "gemini-3.1-pro", multiplier: 2, tier_restriction: ["pro", "premium", "school", "trial"] }
+        ]);
+      }
+    } catch {
+      setAiModels([
+        { id: "gemini-flash", name: "Gemini 2.5 Flash", api_string: "gemini-2.5-flash", multiplier: 1, tier_restriction: ["basic", "pro", "premium", "school", "trial"] },
+        { id: "gemini-pro", name: "Gemini 2.5 Pro", api_string: "gemini-2.5-pro", multiplier: 2, tier_restriction: ["pro", "premium", "school", "trial"] },
+        { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", api_string: "gemini-3.5-flash", multiplier: 1, tier_restriction: ["basic", "pro", "premium", "school", "trial"] },
+        { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", api_string: "gemini-3.1-pro", multiplier: 2, tier_restriction: ["pro", "premium", "school", "trial"] }
+      ]);
+    }
   }
 
   async function switchWorkspace(id: string) {
@@ -164,6 +193,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     subscriptionTier,
     subscriptionExpiresAt,
     latestSubscriptionTrx,
+    aiModels,
     setSubscriptionTier,
     refresh,
     switchWorkspace
@@ -174,6 +204,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     subscriptionTier,
     subscriptionExpiresAt,
     latestSubscriptionTrx,
+    aiModels,
   ]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

@@ -222,7 +222,7 @@ function parseMarkdownTable(tableLines: string[], keyIndex: number) {
 
 export default function AILessonPlanner() {
   const { profile } = useAuth();
-  const { subscriptionTier, credits, activeWorkspaceId, refresh } = useWorkspace();
+  const { subscriptionTier, credits, activeWorkspaceId, refresh, aiModels } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -236,9 +236,28 @@ export default function AILessonPlanner() {
   const [reviewContent, setReviewContent] = useState("");
   const [previewTab, setPreviewTab] = useState<"content" | "review">("content");
 
-  const [selectedModel, setSelectedModel] = useState<"gemini-flash" | "gemini-pro">(
-    (localStorage.getItem("kurikula_selected_ai_model") as any) || "gemini-flash"
+  const [selectedModel, setSelectedModel] = useState<string>(
+    localStorage.getItem("kurikula_selected_ai_model") || "gemini-flash"
   );
+
+  // Enforce tier-based locks in local state
+  useEffect(() => {
+    if (!aiModels || aiModels.length === 0) return;
+    const currentModelObj = aiModels.find(m => m.id === selectedModel);
+    if (currentModelObj) {
+      const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+      const allowedTiers = currentModelObj.tier_restriction.map((t: string) => t.toLowerCase());
+      if (!allowedTiers.includes(cleanTier)) {
+        const firstAllowed = aiModels.find(m => 
+          m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier)
+        );
+        if (firstAllowed) {
+          setSelectedModel(firstAllowed.id);
+          localStorage.setItem("kurikula_selected_ai_model", firstAllowed.id);
+        }
+      }
+    }
+  }, [subscriptionTier, aiModels, selectedModel]);
 
   // Form states matching user requirements
   const [jenjang, setJenjang] = useState("");
@@ -340,7 +359,8 @@ export default function AILessonPlanner() {
       ? { tahunAjaran: `${year}/${year + 1}`, semester: "Ganjil" }
       : { tahunAjaran: `${year - 1}/${year}`, semester: "Genap" };
 
-    const cost = selectedModel === "gemini-pro" ? 20 : 10;
+    const activeModel = aiModels.find(m => m.id === selectedModel);
+    const cost = activeModel ? 10 * Number(activeModel.multiplier) : (selectedModel === "gemini-pro" ? 20 : 10);
     if ((credits?.balance ?? 0) < cost) {
       toast.error("AI Credit tidak cukup. Silakan top up atau upgrade paket.");
       navigate("/billing");
@@ -882,9 +902,12 @@ export default function AILessonPlanner() {
                 <select
                   value={selectedModel}
                   onChange={(e) => {
-                    const m = e.target.value as any;
-                    if (m === "gemini-pro" && !["pro", "premium", "school", "trial"].includes(subscriptionTier)) {
-                      toast.error("Model Gemini Pro hanya tersedia pada Paket Pro atau Premium. Silakan upgrade paket Anda.");
+                    const m = e.target.value;
+                    const modelObj = aiModels.find(item => item.id === m);
+                    const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+                    const isAllowed = modelObj ? modelObj.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier) : true;
+                    if (!isAllowed) {
+                      toast.error("Model ini tidak tersedia untuk paket Anda. Silakan upgrade paket Anda.");
                       return;
                     }
                     setSelectedModel(m);
@@ -892,14 +915,31 @@ export default function AILessonPlanner() {
                   }}
                   className="px-2 py-1 bg-white border border-gray-200 rounded-[6px]"
                 >
-                  <option value="gemini-flash">Gemini Flash</option>
-                  <option value="gemini-pro">
-                    Gemini Pro {!["pro", "premium", "school", "trial"].includes(subscriptionTier) ? "🔒" : ""}
-                  </option>
+                  {aiModels && aiModels.length > 0 ? (
+                    aiModels.map((m) => {
+                      const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+                      const isAllowed = m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier);
+                      return (
+                        <option key={m.id} value={m.id} disabled={!isAllowed}>
+                          {m.name} {!isAllowed ? "🔒" : ""}
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <option value="gemini-flash">Gemini Flash</option>
+                      <option value="gemini-pro" disabled={subscriptionTier === "basic"}>
+                        Gemini Pro {subscriptionTier === "basic" ? "🔒" : ""}
+                      </option>
+                    </>
+                  )}
                 </select>
               </div>
               <div className="text-right">
-                <p className="text-gray-400">Estimasi Biaya: <span className="text-blue-700 font-extrabold">{selectedModel === "gemini-pro" ? "20" : "10"} Credit</span></p>
+                <p className="text-gray-400">Estimasi Biaya: <span className="text-blue-700 font-extrabold">{(() => {
+                  const activeModel = aiModels.find(m => m.id === selectedModel);
+                  return activeModel ? 10 * Number(activeModel.multiplier) : (selectedModel === "gemini-pro" ? 20 : 10);
+                })()} Credit</span></p>
                 <p className="text-gray-400 mt-0.5">Saldo: {credits?.balance ?? 0} Credit</p>
               </div>
             </div>

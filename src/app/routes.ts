@@ -19,6 +19,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 import TermsOfService from "./pages/TermsOfService";
+import ResetPassword from "./pages/ResetPassword";
+import AIChatPage from "./pages/AIChatPage";
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +34,10 @@ export const router = createBrowserRouter([
   {
     path: "/signup",
     Component: SignUp,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/privacy-policy",
@@ -64,6 +70,7 @@ export const router = createBrowserRouter([
       { path: "settings", Component: Settings },
       { path: "admin", Component: SuperAdmin },
       { path: "school-admin", Component: SchoolAdmin },
+      { path: "ai-chat", Component: AIChatPage },
     ],
   },
 ]);

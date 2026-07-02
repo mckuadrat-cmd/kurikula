@@ -211,7 +211,7 @@ const getHeaderGroups = (cols: AssessmentColumn[]) => {
 
 export default function Assessment() {
   const { session } = useAuth();
-  const { subscriptionTier, credits, activeWorkspaceId, refresh } = useWorkspace();
+  const { subscriptionTier, credits, activeWorkspaceId, refresh, aiModels } = useWorkspace();
   const isProOrAbove = ["pro", "premium", "school", "trial"].includes(subscriptionTier);
   const isPremiumOrAbove = ["premium", "school", "trial"].includes(subscriptionTier);
   const navigate = useNavigate();
@@ -402,9 +402,28 @@ export default function Assessment() {
   const [isGeneratingAction, setIsGeneratingAction] = useState(false);
 
   // Sheets variables
-  const [selectedModel, setSelectedModel] = useState<"gemini-flash" | "gemini-pro">(
-    (localStorage.getItem("kurikula_selected_ai_model") as any) || "gemini-flash"
+  const [selectedModel, setSelectedModel] = useState<string>(
+    localStorage.getItem("kurikula_selected_ai_model") || "gemini-flash"
   );
+
+  // Enforce tier-based locks in local state
+  useEffect(() => {
+    if (!aiModels || aiModels.length === 0) return;
+    const currentModelObj = aiModels.find(m => m.id === selectedModel);
+    if (currentModelObj) {
+      const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+      const allowedTiers = currentModelObj.tier_restriction.map((t: string) => t.toLowerCase());
+      if (!allowedTiers.includes(cleanTier)) {
+        const firstAllowed = aiModels.find(m => 
+          m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier)
+        );
+        if (firstAllowed) {
+          setSelectedModel(firstAllowed.id);
+          localStorage.setItem("kurikula_selected_ai_model", firstAllowed.id);
+        }
+      }
+    }
+  }, [subscriptionTier, aiModels, selectedModel]);
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [columnsList, setColumnsList] = useState<AssessmentColumn[]>([]);
@@ -1090,7 +1109,8 @@ export default function Assessment() {
 
   const handleGenerateAIComment = async () => {
     if (!selectedRaportStudent) return;
-    const cost = selectedModel === "gemini-pro" ? 2 : 1;
+    const activeModel = aiModels.find(m => m.id === selectedModel);
+    const cost = activeModel ? 1 * Number(activeModel.multiplier) : (selectedModel === "gemini-pro" ? 2 : 1);
     if ((credits?.balance ?? 0) < cost) {
       toast.error("AI Credit tidak cukup.");
       return;
@@ -1277,7 +1297,8 @@ export default function Assessment() {
       return;
     }
 
-    const cost = selectedModel === "gemini-pro" ? 6 : 3;
+    const activeModel = aiModels.find(m => m.id === selectedModel);
+    const cost = activeModel ? 3 * Number(activeModel.multiplier) : (selectedModel === "gemini-pro" ? 6 : 3);
     if ((credits?.balance ?? 0) < cost) {
       toast.error("AI Credit tidak cukup.");
       return;
@@ -2327,7 +2348,8 @@ export default function Assessment() {
       return;
     }
 
-    const cost = selectedModel === "gemini-pro" ? 8 : 4;
+    const activeModel = aiModels.find(m => m.id === selectedModel);
+    const cost = activeModel ? 4 * Number(activeModel.multiplier) : (selectedModel === "gemini-pro" ? 8 : 4);
     if ((credits?.balance ?? 0) < cost) {
       toast.error("AI Credit tidak cukup.");
       return;

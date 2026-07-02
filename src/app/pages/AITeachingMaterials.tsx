@@ -309,7 +309,7 @@ function renderSimpleMarkdown(text: string) {
 
 export default function AITeachingMaterials() {
   const { profile } = useAuth();
-  const { subscriptionTier, credits, activeWorkspaceId, refresh } = useWorkspace();
+  const { subscriptionTier, credits, activeWorkspaceId, refresh, aiModels } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -326,9 +326,28 @@ export default function AITeachingMaterials() {
   const [reviewContent, setReviewContent] = useState("");
   const [previewTab, setPreviewTab] = useState<"content" | "review">("content");
 
-  const [selectedModel, setSelectedModel] = useState<"gemini-flash" | "gemini-pro">(
-    (localStorage.getItem("kurikula_selected_ai_model") as any) || "gemini-flash"
+  const [selectedModel, setSelectedModel] = useState<string>(
+    localStorage.getItem("kurikula_selected_ai_model") || "gemini-flash"
   );
+
+  // Enforce tier-based locks in local state
+  useEffect(() => {
+    if (!aiModels || aiModels.length === 0) return;
+    const currentModelObj = aiModels.find(m => m.id === selectedModel);
+    if (currentModelObj) {
+      const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+      const allowedTiers = currentModelObj.tier_restriction.map((t: string) => t.toLowerCase());
+      if (!allowedTiers.includes(cleanTier)) {
+        const firstAllowed = aiModels.find(m => 
+          m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier)
+        );
+        if (firstAllowed) {
+          setSelectedModel(firstAllowed.id);
+          localStorage.setItem("kurikula_selected_ai_model", firstAllowed.id);
+        }
+      }
+    }
+  }, [subscriptionTier, aiModels, selectedModel]);
 
   const getMaterialCost = (type: string, model: string): number => {
     let base = 5;
@@ -339,7 +358,8 @@ export default function AITeachingMaterials() {
     else if (type === "ppt") base = 5;
     else if (type === "bahan_ajar") base = 5;
 
-    const mult = model === "gemini-pro" ? 2 : 1;
+    const activeModel = aiModels.find(m => m.id === model);
+    const mult = activeModel ? Number(activeModel.multiplier) : (model === "gemini-pro" ? 2 : 1);
     return base * mult;
   };
 
@@ -1502,9 +1522,12 @@ export default function AITeachingMaterials() {
                       <select
                         value={selectedModel}
                         onChange={(e) => {
-                          const newModel = e.target.value as any;
-                          if (newModel === "gemini-pro" && !["pro", "premium", "school", "trial"].includes(subscriptionTier)) {
-                            toast.error("Model Gemini Pro hanya tersedia pada Paket Pro atau Premium. Silakan upgrade paket Anda.");
+                          const newModel = e.target.value;
+                          const modelObj = aiModels.find(item => item.id === newModel);
+                          const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+                          const isAllowed = modelObj ? modelObj.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier) : true;
+                          if (!isAllowed) {
+                            toast.error("Model ini tidak tersedia untuk paket Anda. Silakan upgrade paket Anda.");
                             return;
                           }
                           setSelectedModel(newModel);
@@ -1512,10 +1535,24 @@ export default function AITeachingMaterials() {
                         }}
                         className="text-base px-2 py-1.5 bg-white border border-gray-200 rounded-[8px] focus:outline-none text-gray-700 font-bold shadow-sm"
                       >
-                        <option value="gemini-flash">Gemini Flash</option>
-                        <option value="gemini-pro">
-                          Gemini Pro (Kualitas Tinggi) {!["pro", "premium", "school", "trial"].includes(subscriptionTier) ? "🔒" : ""}
-                        </option>
+                        {aiModels && aiModels.length > 0 ? (
+                          aiModels.map((m) => {
+                            const cleanTier = (subscriptionTier || "inactive").toLowerCase();
+                            const isAllowed = m.tier_restriction.map((t: string) => t.toLowerCase()).includes(cleanTier);
+                            return (
+                              <option key={m.id} value={m.id} disabled={!isAllowed}>
+                                {m.name} {!isAllowed ? "🔒" : ""}
+                              </option>
+                            );
+                          })
+                        ) : (
+                          <>
+                            <option value="gemini-flash">Gemini Flash</option>
+                            <option value="gemini-pro">
+                              Gemini Pro (Kualitas Tinggi) {subscriptionTier === "basic" ? "🔒" : ""}
+                            </option>
+                          </>
+                        )}
                       </select>
                     </div>
                     <div className="text-right">

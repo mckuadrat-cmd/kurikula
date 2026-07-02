@@ -1,5 +1,5 @@
 export class CreditCalculator {
-  static getCreditCost(type: string, model: string): number {
+  static getCreditCost(type: string, model: string, customMultiplier?: number): number {
     let baseCost = 0;
     const cleanType = type.toLowerCase();
     
@@ -53,7 +53,7 @@ export class CreditCalculator {
         baseCost = 1;
     }
     
-    const multiplier = (model === "gemini-pro" || model === "gemini-2.5-pro") ? 2 : 1;
+    const multiplier = customMultiplier !== undefined ? Number(customMultiplier) : ((model === "gemini-pro" || model === "gemini-2.5-pro") ? 2 : 1);
     return baseCost * multiplier;
   }
 

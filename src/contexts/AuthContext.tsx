@@ -27,6 +27,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, metadata?: Record<string, any>) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (metadata: Record<string, any>) => Promise<{ error: any }>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: any }>;
+  updatePassword: (password: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -214,6 +216,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetPasswordForEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      return { error };
+    } catch (error) {
+      console.error('Reset password email exception:', error);
+      return { error };
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      return { error };
+    } catch (error) {
+      console.error('Update password exception:', error);
+      return { error };
+    }
+  };
+
   const isSuperAdmin = user?.email?.toLowerCase() === 'mckuadratid@gmail.com' || user?.user_metadata?.role === 'superadmin';
 
   const value = {
@@ -227,6 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     updateProfile,
+    resetPasswordForEmail,
+    updatePassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
