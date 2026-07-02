@@ -554,8 +554,8 @@ export default function AIChatPage() {
             </div>
 
             {/* Conversation list */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 mb-2">Riwayat Percakapan</h4>
+            <div className="flex-1 overflow-y-auto p-3 space-y-0.5">
+              <h4 className="text-xs font-black text-slate-450 uppercase tracking-widest px-1 mb-2">Riwayat Percakapan</h4>
               {loadingHistory && conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-xs gap-2">
                   <RefreshCw className="w-4 h-4 animate-spin text-indigo-500" />
@@ -568,25 +568,17 @@ export default function AIChatPage() {
                   <div
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv.id)}
-                    className={`group p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-slate-350 hover:shadow ${activeConversationId === conv.id
-                        ? "border-indigo-500 ring-2 ring-indigo-500/10 bg-indigo-50/5"
-                        : "border-slate-150"
+                    className={`group px-3 border transition-all cursor-pointer flex items-center justify-between gap-3 ${activeConversationId === conv.id
+                        ? "bg-slate-100 border-slate-200/80 shadow-sm py-2.5 my-1.5 rounded-[12px]"
+                        : "bg-transparent border-transparent hover:bg-slate-150/40 py-1 my-0 rounded-[8px]"
                       }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-slate-800 truncate">{conv.title}</p>
-                      <span className="text-[8px] font-black text-slate-400 uppercase font-mono mt-0.5 block">
-                        {new Date(conv.updated_at).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </span>
                     </div>
                     <button
                       onClick={(e) => handleDeleteConversation(conv.id, e)}
-                      className="p-1.5 text-slate-405 hover:text-red-650 hover:bg-red-50 rounded-[8px] transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
+                      className="p-1 text-slate-405 hover:text-red-650 hover:bg-red-50 rounded-[8px] transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -736,17 +728,16 @@ export default function AIChatPage() {
             {/* Quick Actions (only if empty or prompt screen) */}
             {messages.length <= 1 && (
               <div className="hidden sm:block">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Menu Aksi Cepat Asisten</span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {quickActionMenus.map((menu) => (
                     <button
-                      key={menu.label}
+                      key={menu.prompt}
                       disabled={isLocked || isTyping || loadingHistory}
                       onClick={() => handleSend(menu.prompt)}
-                      className="p-3 bg-slate-50 border border-slate-200 hover:border-indigo-300 rounded-[12px] text-[10px] text-slate-700 hover:text-indigo-700 font-extrabold transition-all text-left truncate disabled:opacity-50 cursor-pointer flex items-center justify-between hover:bg-indigo-50/20"
+                      className="p-4 bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/10 rounded-[16px] text-sm text-slate-700 hover:text-indigo-700 font-medium transition-all text-left disabled:opacity-50 cursor-pointer shadow-sm hover:shadow-md flex items-start gap-2.5"
                     >
-                      <span>{menu.label}</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                      <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                      <span className="leading-relaxed">{menu.prompt}</span>
                     </button>
                   ))}
                 </div>

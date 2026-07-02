@@ -2656,7 +2656,7 @@ export default function Assessment() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 flex-1">
+                  <div className={`space-y-3 flex-1 transition-all ${!isProOrAbove ? "opacity-60 filter blur-[0.8px]" : ""}`}>
                     {/* Buat Soal AI */}
                     <div
                       onClick={() => handleColumnAClick("buat-soal")}
@@ -2747,7 +2747,7 @@ export default function Assessment() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 flex-1">
+                  <div className={`space-y-3 flex-1 transition-all ${!isPremiumOrAbove ? "opacity-60 filter blur-[0.8px]" : ""}`}>
                     {/* Paket Ujian */}
                     <div
                       onClick={() => handleColumnBClick("paket-ujian")}
@@ -2838,7 +2838,7 @@ export default function Assessment() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 flex-1">
+                  <div className={`space-y-3 flex-1 transition-all ${!isPremiumOrAbove ? "opacity-60 filter blur-[0.8px]" : ""}`}>
                     {/* Koreksi Otomatis */}
                     <div
                       onClick={() => handleColumnCClick("koreksi-otomatis")}

@@ -198,7 +198,12 @@ export function AIChatPanel() {
   );
   const [showHistory, setShowHistory] = useState(false);
 
-  const isLocked = subscriptionTier === "inactive";
+  const isLocked =
+    subscriptionTier === "inactive" ||
+    ((location.pathname.includes("semester-planner") ||
+      location.pathname.includes("ai-planner") ||
+      location.pathname.includes("ai-materials")) &&
+     !["pro", "premium", "school", "trial"].includes(subscriptionTier || ""));
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -622,6 +627,11 @@ export function AIChatPanel() {
             whileTap={{ scale: 0.9 }}
           >
             <MessageCircle className="w-6 h-6 text-white" />
+            {isLocked && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border border-white shadow">
+                <span className="text-[10px] text-white">🔒</span>
+              </div>
+            )}
             <motion.div
               className="absolute inset-0 rounded-full bg-white/30"
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
@@ -746,8 +756,8 @@ export function AIChatPanel() {
               )}
 
               {showHistory ? (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2">Semua Riwayat Obrolan</h4>
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black text-gray-450 uppercase tracking-widest px-1 mb-2">Semua Riwayat Obrolan</h4>
                   {conversations.length === 0 ? (
                     <p className="text-xs text-gray-400 italic text-center py-8">Belum ada riwayat percakapan.</p>
                   ) : (
@@ -755,9 +765,9 @@ export function AIChatPanel() {
                       <div
                         key={conv.id}
                         onClick={() => handleSelectConversation(conv)}
-                        className={`p-3 rounded-[12px] border transition-all cursor-pointer flex items-center justify-between gap-3 bg-white shadow-sm hover:border-gray-300 hover:shadow ${activeConversationId === conv.id
-                          ? "border-indigo-500 ring-1 ring-indigo-500/50 bg-indigo-50/10"
-                          : "border-gray-150"
+                        className={`px-3 border transition-all cursor-pointer flex items-center justify-between gap-3 group ${activeConversationId === conv.id
+                          ? "bg-slate-100 border-slate-200/80 shadow-sm py-2.5 my-1.5 rounded-[12px]"
+                          : "bg-transparent border-transparent hover:bg-slate-150/40 py-1 my-0 rounded-[8px]"
                           }`}
                       >
                         <div className="flex-1 min-w-0">
@@ -765,16 +775,10 @@ export function AIChatPanel() {
                             <span className="truncate">{conv.title}</span>
                             <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-gray-100 rounded text-gray-650 uppercase font-mono tracking-tighter shrink-0">{conv.context_type}</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-1">
-                            Diperbarui: {new Date(conv.updated_at).toLocaleString("id-ID", {
-                              dateStyle: "short",
-                              timeStyle: "short"
-                            })}
-                          </div>
                         </div>
                         <button
                           onClick={(e) => handleDeleteConversation(conv.id, e)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-[8px] transition-colors cursor-pointer shrink-0"
+                          className="p-1 text-gray-405 hover:text-red-650 hover:bg-red-50 rounded-[8px] transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -822,21 +826,17 @@ export function AIChatPanel() {
 
             {/* Quick Actions Menu - Accordion/Slide-up (Only if not showing history) */}
             {!showHistory && (
-              <div className="px-4 py-2 border-t border-gray-200 bg-white max-h-36 overflow-y-auto">
-                <p className="text-xs text-gray-400 font-bold uppercase mb-1.5 flex items-center gap-1">
-                  <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
-                  Menu Cepat Asisten:
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
+              <div className="px-4 py-3 border-t border-gray-200 bg-white max-h-40 overflow-y-auto">
+                <div className="flex flex-col gap-2">
                   {quickActionMenus.map((menu) => (
                     <button
-                      key={menu.label}
+                      key={menu.prompt}
                       disabled={isLocked || isTyping || loadingHistory}
                       onClick={() => handleSend(menu.prompt)}
-                      className="px-2.5 py-1.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-[10px] text-xs text-gray-700 hover:text-indigo-700 font-bold transition-all text-left truncate disabled:opacity-50 cursor-pointer flex items-center justify-between"
+                      className="p-3 bg-slate-50 hover:bg-indigo-50/10 border border-gray-200 hover:border-indigo-200 rounded-[12px] text-xs text-gray-700 hover:text-indigo-700 font-medium transition-all text-left disabled:opacity-50 cursor-pointer flex items-start gap-2.5 shadow-sm"
                     >
-                      <span>{menu.label}</span>
-                      <ChevronRight className="w-3 h-3 opacity-50 flex-shrink-0" />
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                      <span className="leading-relaxed">{menu.prompt}</span>
                     </button>
                   ))}
                 </div>
