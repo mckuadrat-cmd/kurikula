@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { CreditCard, Sparkles, Check, TrendingUp, Download, Calendar } from "lucide-react";
+import { CreditCard, Sparkles, Check, TrendingUp, Download, Calendar, ShieldCheck } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { toast } from "sonner";
 import { supabase } from "../../../utils/supabase/client";
+import { useAuth } from "../../contexts/AuthContext";
 
 
 const pricingTiers = [
@@ -94,12 +95,18 @@ const topUpPackages = [
 
 export default function Billing() {
   const { subscriptionTier, credits, activeWorkspaceId, refresh, subscriptionExpiresAt, workspaces } = useWorkspace();
+  const { user } = useAuth();
   const [selectedTierToBuy, setSelectedTierToBuy] = useState<{ key: string; name: string; price: string } | null>(null);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [dbTransactions, setDbTransactions] = useState<any[]>([]);
   const [isLoadingTrx, setIsLoadingTrx] = useState(false);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [successModalData, setSuccessModalData] = useState<{ name: string; key: string } | null>(null);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
+
+  const canTopUp = ["pro", "premium", "school"].includes(subscriptionTier);
+  const pendingTransactions = dbTransactions.filter((t) => t.status === "pending");
 
   const fetchTransactions = async () => {
     if (!activeWorkspaceId) return;
@@ -165,8 +172,12 @@ export default function Billing() {
   };
 
   const handleTopUpClick = () => {
-    if (subscriptionTier === "basic" || subscriptionTier === "inactive" || subscriptionTier === "trial") {
-      toast.error("Top Up Credit hanya tersedia untuk paket Pro and Premium. Silakan upgrade terlebih dahulu.");
+    if (!activeWorkspaceId) {
+      toast.error("Workspace aktif tidak ditemukan. Silakan pilih workspace terlebih dahulu.");
+      return;
+    }
+    if (!canTopUp) {
+      toast.error("Top Up Credit hanya tersedia untuk paket Pro dan Premium. Silakan upgrade terlebih dahulu.");
       scrollToPricing();
       return;
     }
@@ -174,12 +185,21 @@ export default function Billing() {
   };
 
   const handleSelectPlan = (baseKey: string, tierName: string, tierPrice: string) => {
+    if (!activeWorkspaceId) {
+      toast.error("Workspace aktif tidak ditemukan. Silakan pilih workspace terlebih dahulu.");
+      return;
+    }
     if (baseKey === "school") {
       const message = encodeURIComponent("Halo Admin Kurikula, saya tertarik dengan paket School untuk sekolah saya.");
       window.open(`https://wa.me/62818393931?text=${message}`, "_blank");
       return;
     }
     if (baseKey.startsWith("topup-")) {
+      if (!canTopUp) {
+        toast.error("Top Up Credit hanya tersedia untuk paket Pro dan Premium yang aktif.");
+        scrollToPricing();
+        return;
+      }
       setSelectedTierToBuy({ key: baseKey, name: tierName, price: `Rp ${tierPrice}` });
       return;
     }
@@ -194,14 +214,36 @@ export default function Billing() {
   };
 
   const handleConfirmPayment = async () => {
-    if (!selectedTierToBuy) return;
+    if (!selectedTierToBuy || isPaymentProcessing) return;
+    if (!activeWorkspaceId) {
+      toast.error("Workspace aktif tidak ditemukan.");
+      return;
+    }
+    if (!user) {
+      toast.error("Sesi login tidak ditemukan. Silakan login ulang.");
+      return;
+    }
+    if (selectedTierToBuy.key.startsWith("topup-") && !canTopUp) {
+      toast.error("Top Up hanya tersedia untuk paket Pro dan Premium yang aktif.");
+      setSelectedTierToBuy(null);
+      return;
+    }
+    if (typeof (window as any).snap?.pay !== "function") {
+      toast.error("Payment gateway belum siap. Muat ulang halaman lalu coba lagi.");
+      return;
+    }
+
     const { key: tierKey, name: tierName } = selectedTierToBuy;
     setSelectedTierToBuy(null); // Tutup modal
+    setIsPaymentProcessing(true);
 
     const toastId = toast.loading("Menyiapkan tagihan pembayaran...");
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const tokenUser = sessionData?.session?.access_token;
+      if (!tokenUser) {
+        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/charge`,
@@ -234,8 +276,7 @@ export default function Billing() {
       toast.dismiss(toastId);
       fetchTransactions(); // Tampilkan transaksi pending di background langsung
 
-      // @ts-ignore
-      window.snap.pay(token, {
+      (window as any).snap.pay(token, {
         onSuccess: function (result: any) {
           toast.success("Pembayaran Berhasil!");
           setSuccessModalData({
@@ -262,14 +303,26 @@ export default function Billing() {
     } catch (err: any) {
       toast.dismiss(toastId);
       toast.error(err.message || "Gagal memproses tagihan.");
+    } finally {
+      setIsPaymentProcessing(false);
     }
   };
 
   const handleCancelTransaction = async (orderId: string) => {
+    if (!activeWorkspaceId) {
+      toast.error("Workspace aktif tidak ditemukan.");
+      return;
+    }
+    if (cancelingOrderId) return;
+
     const toastId = toast.loading("Membatalkan tagihan pending...");
+    setCancelingOrderId(orderId);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const tokenUser = sessionData?.session?.access_token;
+      if (!tokenUser) {
+        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/cancel`,
@@ -297,6 +350,8 @@ export default function Billing() {
     } catch (err: any) {
       toast.dismiss(toastId);
       toast.error(err.message || "Gagal membatalkan tagihan.");
+    } finally {
+      setCancelingOrderId(null);
     }
   };
 
@@ -371,6 +426,25 @@ export default function Billing() {
           </div>
         </div>
       </motion.div>
+
+      <div className="bg-white border border-emerald-100 rounded-[12px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-[10px] bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-gray-900">Pembayaran diverifikasi server</div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Aktivasi paket hanya dilakukan setelah webhook Midtrans tervalidasi. Refresh otomatis aktif selama ada tagihan pending.
+            </p>
+          </div>
+        </div>
+        {pendingTransactions.length > 0 && (
+          <div className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-[10px] text-xs font-bold">
+            {pendingTransactions.length} tagihan menunggu pembayaran
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Usage Chart */}
@@ -487,9 +561,10 @@ export default function Billing() {
                           )}
                           <button
                             onClick={() => handleCancelTransaction(trx.order_id)}
+                            disabled={cancelingOrderId === trx.order_id}
                             className="px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-[6px] text-xs font-bold transition-colors border border-gray-300 cursor-pointer"
                           >
-                            Batalkan
+                            {cancelingOrderId === trx.order_id ? "..." : "Batalkan"}
                           </button>
                         </div>
                       )}
@@ -697,9 +772,10 @@ export default function Billing() {
               </button>
               <button
                 onClick={handleConfirmPayment}
-                className="flex-1 py-2.5 bg-[#3C405B] hover:bg-[#3C405B]/90 text-white rounded-[12px] font-semibold text-xs transition-colors cursor-pointer shadow-sm"
+                disabled={isPaymentProcessing}
+                className="flex-1 py-2.5 bg-[#3C405B] hover:bg-[#3C405B]/90 text-white rounded-[12px] font-semibold text-xs transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Lanjutkan
+                {isPaymentProcessing ? "Memproses..." : "Lanjutkan"}
               </button>
             </div>
           </motion.div>

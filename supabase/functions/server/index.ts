@@ -386,6 +386,25 @@ app.post("/make-server-84c63b2a/charge", async (c) => {
   try {
     const { workspaceId, tierKey } = await c.req.json();
 
+    if (!workspaceId || typeof workspaceId !== "string" || !tierKey || typeof tierKey !== "string") {
+      return c.json({ error: "Workspace dan paket wajib diisi." }, 400);
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const user = await verifyUser(c);
+    if (!user) {
+      return c.json({ error: "Unauthorized. Silakan login kembali." }, 401);
+    }
+
+    const member = await verifyWorkspaceMember(supabase, workspaceId, user.id);
+    if (!member) {
+      return c.json({ error: "Forbidden. Anda bukan anggota workspace ini." }, 403);
+    }
+
     // Validasi harga server-side
     let amount = 0;
     if (tierKey === "basic") amount = 29000;
@@ -398,6 +417,27 @@ app.post("/make-server-84c63b2a/charge", async (c) => {
     else if (tierKey === "topup-250") amount = 30000;
     else if (tierKey === "topup-500") amount = 50000;
     else return c.json({ error: "Paket tidak valid" }, 400);
+
+    const { data: workspace, error: errWorkspace } = await supabase
+      .from("workspaces")
+      .select("subscription_tier, subscription_status, subscription_expires_at")
+      .eq("id", workspaceId)
+      .single();
+
+    if (errWorkspace || !workspace) {
+      return c.json({ error: "Workspace tidak ditemukan." }, 404);
+    }
+
+    const isTopUp = tierKey.startsWith("topup-");
+    if (isTopUp) {
+      const topUpAllowedTiers = ["pro", "premium", "school"];
+      const expiresAt = workspace.subscription_expires_at ? new Date(workspace.subscription_expires_at) : null;
+      const isActive = workspace.subscription_status === "active" && (!expiresAt || expiresAt > new Date());
+
+      if (!isActive || !topUpAllowedTiers.includes((workspace.subscription_tier || "").toLowerCase())) {
+        return c.json({ error: "Top Up hanya tersedia untuk paket Pro, Premium, atau School yang masih aktif." }, 403);
+      }
+    }
 
     const orderId = `KURI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
@@ -429,19 +469,13 @@ app.post("/make-server-84c63b2a/charge", async (c) => {
       throw new Error(snapData.error_messages?.join(", ") || "Failed to contact Midtrans");
     }
 
-    // Sambungkan ke database Supabase
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     const isYearly = tierKey.endsWith("-yearly");
-    const isTopUp = tierKey.startsWith("topup-");
     const billingCycle = isTopUp ? null : (isYearly ? "yearly" : "monthly");
 
     // Catat data transaksi pembayaran awal (pending)
     const { error } = await supabase.from("payment_transactions").insert({
       workspace_id: workspaceId,
+      user_id: user.id,
       order_id: orderId,
       amount,
       tier_key: tierKey,
@@ -462,7 +496,21 @@ app.post("/make-server-84c63b2a/charge", async (c) => {
 app.post("/make-server-84c63b2a/webhook", async (c) => {
   try {
     const body = await c.req.json();
-    const { order_id, transaction_status, fraud_status } = body;
+    const { order_id, transaction_status, fraud_status, status_code, gross_amount, signature_key } = body;
+
+    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
+    if (!serverKey) {
+      return c.text("Missing MIDTRANS_SERVER_KEY", 500);
+    }
+
+    if (!order_id || !status_code || !gross_amount || !signature_key) {
+      return c.text("Invalid webhook payload", 400);
+    }
+
+    const expectedSignature = await sha512Hex(`${order_id}${status_code}${gross_amount}${serverKey}`);
+    if (expectedSignature !== String(signature_key).toLowerCase()) {
+      return c.text("Invalid signature", 403);
+    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -481,6 +529,10 @@ app.post("/make-server-84c63b2a/webhook", async (c) => {
         .single();
 
       if (errTrx) throw new Error(errTrx.message);
+
+      if (Number(trx.amount) !== Number(gross_amount)) {
+        return c.text("Amount mismatch", 400);
+      }
 
       if (trx && trx.status === "pending") {
         // A. Ubah status transaksi menjadi 'success'
@@ -564,10 +616,41 @@ app.post("/make-server-84c63b2a/cancel", async (c) => {
   try {
     const { workspaceId, orderId } = await c.req.json();
 
+    if (!workspaceId || typeof workspaceId !== "string" || !orderId || typeof orderId !== "string") {
+      return c.json({ error: "Workspace dan order ID wajib diisi." }, 400);
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const user = await verifyUser(c);
+    if (!user) {
+      return c.json({ error: "Unauthorized. Silakan login kembali." }, 401);
+    }
+
+    const member = await verifyWorkspaceMember(supabase, workspaceId, user.id);
+    if (!member) {
+      return c.json({ error: "Forbidden. Anda bukan anggota workspace ini." }, 403);
+    }
+
+    const { data: trx, error: errTrx } = await supabase
+      .from("payment_transactions")
+      .select("user_id, status")
+      .eq("workspace_id", workspaceId)
+      .eq("order_id", orderId)
+      .maybeSingle();
+
+    if (errTrx) throw new Error(errTrx.message);
+    if (!trx || trx.status !== "pending") {
+      return c.json({ error: "Transaksi pending tidak ditemukan." }, 404);
+    }
+
+    const canCancelAny = ["owner", "admin"].includes(member.role);
+    if (trx.user_id && trx.user_id !== user.id && !canCancelAny) {
+      return c.json({ error: "Anda tidak berwenang membatalkan tagihan ini." }, 403);
+    }
 
     // Tandai transaksi sebagai gagal/batal jika sebelumnya masih pending
     const { error } = await supabase
@@ -1235,6 +1318,26 @@ async function verifyUser(c: any) {
   } catch {
     return null;
   }
+}
+
+async function verifyWorkspaceMember(supabase: any, workspaceId: string, userId: string) {
+  const { data: member, error } = await supabase
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !member) return null;
+  return member;
+}
+
+async function sha512Hex(value: string) {
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-512", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // 4. POST /workspaces/:id/invitations - Mengirim undangan gabung ke sekolah via email

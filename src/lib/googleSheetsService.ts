@@ -12,6 +12,15 @@ declare global {
 // Global state untuk menyimpan token client instance
 let tokenClient: any = null;
 
+export type GoogleConnectionStatus = {
+  status: "disconnected" | "connected" | "expired";
+  isConnected: boolean;
+  hasValidToken: boolean;
+  needsReconnect: boolean;
+  expiresAt: number | null;
+  message: string;
+};
+
 /**
  * Meload script Google Identity Services secara dinamis
  */
@@ -76,7 +85,8 @@ export async function initGoogleAuth(
 }
 
 /**
- * Mengecek apakah user sebelumnya pernah terhubung, dan memperbarui token secara silent jika expired
+ * Mengecek apakah user memiliki token aktif. GIS token client di browser tidak
+ * menyediakan refresh token permanen, jadi token expired tetap perlu reconnect.
  */
 export async function checkAndRenewToken(onSuccess?: (token: string) => void): Promise<string | null> {
   const activeToken = getAccessToken();
@@ -108,6 +118,52 @@ export function getAccessToken(): string | null {
 }
 
 /**
+ * Status koneksi Google yang eksplisit untuk UI.
+ * - disconnected: belum pernah connect / sudah disconnect
+ * - expired: pernah connect, tapi token browser sudah habis/hilang
+ * - connected: token aktif dan bisa dipakai untuk API Google
+ */
+export function getGoogleConnectionStatus(): GoogleConnectionStatus {
+  const connectedFlag = localStorage.getItem("google_connected_flag") === "true";
+  const token = localStorage.getItem("google_access_token");
+  const expiresAtStr = localStorage.getItem("google_token_expires_at");
+  const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+
+  if (!connectedFlag) {
+    return {
+      status: "disconnected",
+      isConnected: false,
+      hasValidToken: false,
+      needsReconnect: false,
+      expiresAt: null,
+      message: "Google Drive belum terhubung.",
+    };
+  }
+
+  if (!token || !expiresAt || Number.isNaN(expiresAt) || Date.now() >= expiresAt) {
+    localStorage.removeItem("google_access_token");
+    localStorage.removeItem("google_token_expires_at");
+    return {
+      status: "expired",
+      isConnected: true,
+      hasValidToken: false,
+      needsReconnect: true,
+      expiresAt: Number.isNaN(expiresAt) ? null : expiresAt,
+      message: "Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang.",
+    };
+  }
+
+  return {
+    status: "connected",
+    isConnected: true,
+    hasValidToken: true,
+    needsReconnect: false,
+    expiresAt,
+    message: "Google Drive terhubung dan siap digunakan.",
+  };
+}
+
+/**
  * Mengecek apakah pengguna terhubung/terotorisasi dengan Google Drive
  */
 export function isAuthorized(): boolean {
@@ -118,7 +174,7 @@ export function isAuthorized(): boolean {
  * Mengecek apakah pengguna memiliki token aktif yang belum kedaluwarsa
  */
 export function hasValidToken(): boolean {
-  return getAccessToken() !== null;
+  return getGoogleConnectionStatus().hasValidToken;
 }
 
 /**
@@ -145,13 +201,10 @@ export function logoutGoogle(): void {
  * Melakukan fetch HTTP terautentikasi ke Google API
  */
 async function fetchGoogleAPI(url: string, options: RequestInit = {}): Promise<any> {
-  let token = getAccessToken();
+  const status = getGoogleConnectionStatus();
+  let token = status.hasValidToken ? getAccessToken() : null;
   if (!token) {
-    // Coba silent renew jika expired tapi flag koneksi aktif
-    token = await checkAndRenewToken();
-  }
-  if (!token) {
-    throw new Error("Sesi Google OAuth habis atau terputus. Silakan hubungkan ulang Google Drive Anda.");
+    throw new Error(status.message);
   }
 
   const headers = new Headers(options.headers || {});
@@ -665,4 +718,3 @@ export async function writeDatabaseConfig(config: Record<string, string>): Promi
     throw error;
   }
 }
-

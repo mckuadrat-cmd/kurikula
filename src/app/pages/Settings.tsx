@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { User, Bell, Lock, Globe, Palette, Database, Save, X, BookOpen, Camera } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "sonner";
-import { isAuthorized, readDatabaseConfig, writeDatabaseConfig, checkAndRenewToken, readSheetRange } from "../../lib/googleSheetsService";
+import { isAuthorized, readDatabaseConfig, writeDatabaseConfig, readSheetRange, hasValidToken } from "../../lib/googleSheetsService";
 import { supabase } from "../../../utils/supabase/client";
 
 export default function Settings() {
@@ -43,7 +43,7 @@ export default function Settings() {
 
 
   const syncSubjectsFromSheet = async () => {
-    if (!isAuthorized()) return;
+    if (!isAuthorized() || !hasValidToken()) return;
     try {
       const gradeRows = await readSheetRange("Penilaian!A2:G");
       const uniqueSubjects = Array.from(new Set(gradeRows.map(row => row[4]).filter(Boolean))) as string[];

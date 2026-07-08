@@ -22,9 +22,9 @@ import { AIGlow } from "../components/AIComponents";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useNavigate } from "react-router";
-import { isAuthorized, readSheetRange } from "../../lib/googleSheetsService";
+import { isAuthorized, readSheetRange, hasValidToken } from "../../lib/googleSheetsService";
+import { generateAIContent } from "../../lib/aiClient";
 import { toast } from "sonner";
-import { supabase } from "../../../utils/supabase/client";
 
 // Interfaces
 interface SemesterMeeting {
@@ -333,7 +333,7 @@ export default function SemesterPlanner() {
 
     // Async load from Google Sheets
     const loadDatabaseData = async () => {
-      if (!isAuthorized()) return;
+      if (!isAuthorized() || !hasValidToken()) return;
       try {
         const siswaRows = await readSheetRange("Siswa!A2:G");
         const rawClasses = Array.from(new Set(siswaRows.map(row => row[3]).filter(Boolean))) as string[];
@@ -402,65 +402,25 @@ export default function SemesterPlanner() {
 
     setIsDiagnosing(true);
     try {
-      if (isAuthorized() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const tokenUser = sessionData?.session?.access_token;
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              workspaceId: activeWorkspaceId,
-              type: "diagnostic",
-              model: selectedModel,
-              params: {
-                jenjang: jenjang || "SMA",
-                kelas: selectedClass,
-                mapel: selectedSubject,
-                kemampuanAwal: diagKemampuanAwal,
-                masalahKelas: diagMasalahKelas,
-                targetKarakter: diagTargetKarakter
-              }
-            })
-          }
-        );
-        if (response.ok) {
-          const res = await response.json();
-          if (res.content) {
-            setDiagOutput(res.content);
-            setHasGeneratedDiag(true);
-            toast.success("Diagnostik Kelas AI berhasil dibuat!");
-          }
-        } else {
-          const errJson = await response.json().catch(() => ({}));
-          toast.error(errJson.error || "Gagal membuat laporan diagnostik kelas.");
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "diagnostic",
+        model: selectedModel,
+        params: {
+          jenjang: jenjang || "SMA",
+          kelas: selectedClass,
+          mapel: selectedSubject,
+          kemampuanAwal: diagKemampuanAwal,
+          masalahKelas: diagMasalahKelas,
+          targetKarakter: diagTargetKarakter
         }
-      } else {
-        // Fallback demo response
-        setTimeout(() => {
-          setDiagOutput(`## LAPORAN DIAGNOSTIK KELAS AI (DEMO)
-Mapel: ${selectedSubject} | Kelas: ${selectedClass}
-
-### Analisis Kesiapan Belajar:
-- **Kemampuan Awal:** Mayoritas siswa sudah memiliki dasar pemahaman awal, namun memerlukan review terfokus di bagian awal.
-- **Rekomendasi Aktivitas:** Gunakan model pembelajaran bermakna (Project Based Learning) untuk menstimulasi kolaborasi siswa.
-
-### Rekomendasi Program Pembelajaran:
-1. Sediakan scaffolding khusus untuk kelompok siswa dengan kemampuan awal rendah.
-2. Fokuskan target karakter: ${diagTargetKarakter} lewat pembiasaan diskusi kelompok.
-`);
-          setHasGeneratedDiag(true);
-          toast.success("Diagnostik Kelas AI berhasil dibuat (Mode Demo)!");
-        }, 1500);
-      }
-    } catch (e) {
+      });
+      setDiagOutput(content);
+      setHasGeneratedDiag(true);
+      toast.success("Diagnostik Kelas AI berhasil dibuat!");
+    } catch (e: any) {
       console.error(e);
-      toast.error("Gagal mendiagnosis kelas.");
+      toast.error(e.message || "Gagal mendiagnosis kelas.");
     } finally {
       setIsDiagnosing(false);
     }
@@ -560,56 +520,31 @@ Mapel: ${selectedSubject} | Kelas: ${selectedClass}
 
     setIsGenerating(true);
     try {
-      let finalContent = "";
-      if (isAuthorized() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const tokenUser = sessionData?.session?.access_token;
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              workspaceId: activeWorkspaceId,
-              type: "semester-plan",
-              model: selectedModel,
-              params: {
-                targetYear,
-                targetSemester,
-                jenjang,
-                selectedClass,
-                selectedSubject,
-                capaianPembelajaran,
-                profilSiswa,
-                targetKarakter,
-                modelPembelajaran,
-                instrumenPenilaian: selectedInstruments,
-                outputDiinginkan,
-                jumlahPertemuan,
-                alokasiJam,
-                mulaiTanggal,
-                proyekAkhir,
-                catatanTambahan
-              }
-            })
-          }
-        );
-        if (response.ok) {
-          const res = await response.json();
-          if (res.content) {
-            finalContent = res.content;
-            if (refresh) {
-              await refresh();
-            }
-          }
-        } else {
-          const errJson = await response.json().catch(() => ({}));
-          toast.error(errJson.error || "Gagal membuat rencana semester.");
+      const finalContent = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "semester-plan",
+        model: selectedModel,
+        params: {
+          targetYear,
+          targetSemester,
+          jenjang,
+          selectedClass,
+          selectedSubject,
+          capaianPembelajaran,
+          profilSiswa,
+          targetKarakter,
+          modelPembelajaran,
+          instrumenPenilaian: selectedInstruments,
+          outputDiinginkan,
+          jumlahPertemuan,
+          alokasiJam,
+          mulaiTanggal,
+          proyekAkhir,
+          catatanTambahan
         }
+      });
+      if (refresh) {
+        await refresh();
       }
 
       // Generate sessions array
@@ -771,9 +706,9 @@ Mapel: ${selectedSubject} | Kelas: ${selectedClass}
       setActivePlanId(newPlan.id);
       setShowFormModal(false);
       toast.success("Rencana Semester AI berhasil dibuat!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Gagal men-generate rencana semester.");
+      toast.error(error.message || "Gagal men-generate rencana semester.");
     } finally {
       setIsGenerating(false);
     }

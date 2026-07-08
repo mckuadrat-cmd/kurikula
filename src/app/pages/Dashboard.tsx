@@ -23,12 +23,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import {
   initGoogleAuth,
-  isAuthorized,
   getOrCreateSpreadsheetId,
   logoutGoogle,
   readSheetRange,
-  checkAndRenewToken,
-  hasValidToken,
+  getGoogleConnectionStatus,
 } from "../../lib/googleSheetsService";
 import { toast } from "sonner";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
@@ -55,8 +53,7 @@ export default function Dashboard() {
     return url;
   };
 
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
+  const [googleConnection, setGoogleConnection] = useState(() => getGoogleConnectionStatus());
   const [connecting, setConnecting] = useState(false);
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState("");
@@ -185,6 +182,15 @@ export default function Dashboard() {
     }
   };
 
+  const googleConnected = googleConnection.isConnected;
+  const hasToken = googleConnection.hasValidToken;
+
+  const refreshGoogleConnection = () => {
+    const status = getGoogleConnectionStatus();
+    setGoogleConnection(status);
+    return status;
+  };
+
   useEffect(() => {
     // Generate tanggal lokal terformat
     const today = new Date();
@@ -198,9 +204,7 @@ export default function Dashboard() {
 
     // Cek koneksi Google
     const initAuth = async () => {
-      await checkAndRenewToken();
-      setGoogleConnected(isAuthorized());
-      setHasToken(hasValidToken());
+      refreshGoogleConnection();
       const savedId = localStorage.getItem("google_spreadsheet_id");
       if (savedId) setSpreadsheetId(savedId);
     };
@@ -208,7 +212,9 @@ export default function Dashboard() {
   }, []);
 
   const loadStats = async () => {
-    if (!isAuthorized()) {
+    const status = getGoogleConnectionStatus();
+    setGoogleConnection(status);
+    if (!status.hasValidToken) {
       setStatsData([
         { icon: Users, label: "Total Siswa", value: "-", color: "primary" },
         { icon: UserCheck, label: "Hadir Hari Ini", value: "-", color: "accent" },
@@ -300,15 +306,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadStats();
-  }, [googleConnected]);
+  }, [googleConnection.status]);
 
   const handleConnectGoogle = async () => {
     setConnecting(true);
     try {
       await initGoogleAuth(
         async (token) => {
-          setGoogleConnected(true);
-          setHasToken(true);
+          refreshGoogleConnection();
           toast.success("Berhasil terhubung ke Google Drive!");
           try {
             const id = await getOrCreateSpreadsheetId(true);
@@ -335,8 +340,7 @@ export default function Dashboard() {
 
   const handleDisconnectGoogle = () => {
     logoutGoogle();
-    setGoogleConnected(false);
-    setHasToken(false);
+    refreshGoogleConnection();
     setSpreadsheetId(null);
     toast.success("Google Drive terputus.");
     loadStats();
@@ -489,6 +493,11 @@ export default function Dashboard() {
                   >
                     {spreadsheetId.substring(0, 15)}... (Buka Google Sheets)
                   </a>
+                </p>
+              )}
+              {googleConnected && !hasToken && (
+                <p className="text-xs text-amber-100 mt-3 max-w-2xl">
+                  {googleConnection.message} Fitur AI tetap bisa digunakan, tetapi sinkronisasi data siswa, absensi, nilai, dan dokumen ke Google Sheets perlu koneksi ulang.
                 </p>
               )}
             </div>

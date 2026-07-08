@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { supabase } from "../../../utils/supabase/client";
+import { generateAIContent } from "../../lib/aiClient";
 
 // Markdown helper functions for AIChatPanel
 function parseInlineMarkdown(text: string) {
@@ -533,67 +534,43 @@ export function AIChatPanel() {
         parts: [{ text: messageText }],
       });
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const tokenUser = sessionData?.session?.access_token;
-
-      // 4. Hubungi server endpoint generate-ai
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "chat",
-            model: selectedModel,
-            params: {
-              contents: formattedHistory,
-              context: {
-                teacherProfile: profile ? `${profile.name || ""} - Guru ${profile.schoolLevel || ""}` : null,
-                activeClass: localStorage.getItem("daftar_kelas")?.split(",")?.[0]?.trim() || null,
-                activeSubject: localStorage.getItem("mata_pelajaran")?.split(",")?.[0]?.trim() || null,
-                lastDocument: contextInfo.title,
-                lastSemesterPlan: localStorage.getItem("rencana_semester_data") ? "Rencana semester telah dikonfigurasi" : null,
-                lastModule: null,
-                teacherMemory: teacherMemoryContext
-              }
-            }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || "Gagal mendapatkan respons AI.");
-      }
-
-      const res = await response.json();
-      if (res.content) {
-        // 5. Simpan pesan asisten ke database
-        await supabase.from("ai_messages").insert({
-          conversation_id: activeConversationId,
-          role: "assistant",
-          content: res.content
-        });
-
-        // Simpan ke local state
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: res.content
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "chat",
+        model: selectedModel,
+        params: {
+          contents: formattedHistory,
+          context: {
+            teacherProfile: profile ? `${profile.name || ""} - Guru ${profile.schoolLevel || ""}` : null,
+            activeClass: localStorage.getItem("daftar_kelas")?.split(",")?.[0]?.trim() || null,
+            activeSubject: localStorage.getItem("mata_pelajaran")?.split(",")?.[0]?.trim() || null,
+            lastDocument: contextInfo.title,
+            lastSemesterPlan: localStorage.getItem("rencana_semester_data") ? "Rencana semester telah dikonfigurasi" : null,
+            lastModule: null,
+            teacherMemory: teacherMemoryContext
           }
-        ]);
-
-        if (refresh) {
-          await refresh();
         }
-      } else {
-        throw new Error("Respons kosong dari server.");
+      });
+
+      // 5. Simpan pesan asisten ke database
+      await supabase.from("ai_messages").insert({
+        conversation_id: activeConversationId,
+        role: "assistant",
+        content
+      });
+
+      // Simpan ke local state
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content
+        }
+      ]);
+
+      if (refresh) {
+        await refresh();
       }
     } catch (e: any) {
       console.error(e);

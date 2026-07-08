@@ -1,12 +1,22 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Search, Download, QrCode, Edit, Trash2, Plus, RefreshCw, AlertCircle, BookOpen } from "lucide-react";
+import { Search, Download, QrCode, Edit, Trash2, Plus, RefreshCw, BookOpen } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { isAuthorized, readSheetRange, appendSheetRows, writeDatabaseConfig, checkAndRenewToken, readDatabaseConfig, hasValidToken } from "../../lib/googleSheetsService";
+import {
+  isAuthorized,
+  readSheetRange,
+  appendSheetRows,
+  updateSheetRange,
+  batchUpdateSheetRanges,
+  writeDatabaseConfig,
+  readDatabaseConfig,
+  hasValidToken
+} from "../../lib/googleSheetsService";
 import { toast } from "sonner";
-import { Link } from "react-router";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { EmptyDataState, GoogleDriveEmptyState, GoogleDriveNotice } from "../components/GoogleDriveState";
 
 
 export default function StudentData() {
@@ -19,7 +29,20 @@ export default function StudentData() {
 
   // Modal states
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<any | null>(null);
   const [newStudent, setNewStudent] = useState({
+    nis: "",
+    name: "",
+    nisn: "",
+    class: "",
+    gender: "L",
+    email: "",
+    phone: "",
+  });
+  const [editStudent, setEditStudent] = useState({
+    originalNis: "",
+    rowIndex: null as number | null,
     nis: "",
     name: "",
     nisn: "",
@@ -30,6 +53,8 @@ export default function StudentData() {
   });
   const [showCustomClassInput, setShowCustomClassInput] = useState(false);
   const [customClassValue, setCustomClassValue] = useState("");
+  const [showEditCustomClassInput, setShowEditCustomClassInput] = useState(false);
+  const [editCustomClassValue, setEditCustomClassValue] = useState("");
 
   // Class Subject Mapping states
   const [isMappingOpen, setIsMappingOpen] = useState(false);
@@ -75,7 +100,7 @@ export default function StudentData() {
   }, []);
 
   const loadData = async () => {
-    if (!isAuthorized()) {
+    if (!isAuthorized() || !hasValidToken()) {
       setStudents([]);
       return;
     }
@@ -84,7 +109,8 @@ export default function StudentData() {
     try {
       const siswaRows = await readSheetRange("Siswa!A2:G");
 
-      const parsedSiswa = siswaRows.map((row) => ({
+      const parsedSiswa = siswaRows.map((row, index) => ({
+        rowIndex: index + 2,
         nis: row[0],
         nisn: row[1] || "",
         name: row[2] || "",
@@ -135,10 +161,8 @@ export default function StudentData() {
 
       setStudents(parsedSiswa);
       const uniqueClasses = Array.from(new Set(parsedSiswa.map(s => s.class).filter(Boolean)));
-      if (uniqueClasses.length > 0) {
-        setClassList(uniqueClasses);
-        localStorage.setItem("daftar_kelas", uniqueClasses.join(","));
-      }
+      setClassList(uniqueClasses);
+      localStorage.setItem("daftar_kelas", uniqueClasses.join(","));
 
       // Load Class-Subject Mapping from Konfigurasi sheet
       try {
@@ -177,6 +201,10 @@ export default function StudentData() {
     e.preventDefault();
     if (!isAuthorized()) {
       toast.error("Hubungkan Google Drive Anda terlebih dahulu!");
+      return;
+    }
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
       return;
     }
 
@@ -289,6 +317,162 @@ export default function StudentData() {
     }
   };
 
+  const openEditStudent = (student: any) => {
+    const classExists = classList.includes(student.class || "");
+    setEditStudent({
+      originalNis: student.nis || "",
+      rowIndex: student.rowIndex ?? null,
+      nis: student.nis || "",
+      name: student.name || "",
+      nisn: student.nisn || "",
+      class: student.class || "",
+      gender: student.gender || "L",
+      email: student.email || "",
+      phone: student.phone || "",
+    });
+    setShowEditCustomClassInput(!classExists);
+    setEditCustomClassValue(classExists ? "" : student.class || "");
+    setIsEditOpen(true);
+  };
+
+  const handleEditStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
+
+    const rowIndex = editStudent.rowIndex;
+    if (!rowIndex) {
+      toast.error("Baris data siswa tidak ditemukan. Silakan refresh data lalu coba lagi.");
+      return;
+    }
+
+    const nisTrimmed = editStudent.nis.trim();
+    if (!nisTrimmed || !/^\d+$/.test(nisTrimmed)) {
+      toast.error("NIS wajib diisi dan hanya boleh berisi angka.");
+      return;
+    }
+
+    const finalClass = (showEditCustomClassInput ? editCustomClassValue.trim() : editStudent.class).trim();
+    if (!finalClass) {
+      toast.error("Kelas wajib diisi.");
+      return;
+    }
+
+    const duplicateNis = students.some((s) => s.nis === nisTrimmed && s.nis !== editStudent.originalNis);
+    if (duplicateNis) {
+      toast.error("NIS sudah dipakai siswa lain.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updatedRow = [
+        nisTrimmed,
+        editStudent.nisn.trim(),
+        editStudent.name.trim(),
+        finalClass,
+        editStudent.gender,
+        editStudent.email.trim(),
+        editStudent.phone.trim(),
+      ];
+
+      await updateSheetRange(`Siswa!A${rowIndex}:G${rowIndex}`, [updatedRow]);
+
+      const relatedUpdates: { range: string; values: any[][] }[] = [];
+
+      try {
+        const gradeRows = await readSheetRange("Penilaian!A2:G");
+        gradeRows.forEach((row, index) => {
+          if (row[1] === editStudent.originalNis) {
+            const sheetRow = index + 2;
+            relatedUpdates.push({
+              range: `Penilaian!B${sheetRow}:D${sheetRow}`,
+              values: [[nisTrimmed, editStudent.name.trim(), finalClass]]
+            });
+          }
+        });
+      } catch (err) {
+        console.warn("Gagal menyiapkan sinkronisasi Penilaian:", err);
+      }
+
+      try {
+        const attendanceRows = await readSheetRange("Absensi!A2:I");
+        attendanceRows.forEach((row, index) => {
+          if (row[2] === editStudent.originalNis) {
+            const sheetRow = index + 2;
+            relatedUpdates.push({
+              range: `Absensi!C${sheetRow}:E${sheetRow}`,
+              values: [[nisTrimmed, editStudent.name.trim(), finalClass]]
+            });
+          }
+        });
+      } catch (err) {
+        console.warn("Gagal menyiapkan sinkronisasi Absensi:", err);
+      }
+
+      if (relatedUpdates.length > 0) {
+        await batchUpdateSheetRanges(relatedUpdates);
+      }
+
+      toast.success("Data siswa berhasil diperbarui.");
+      setIsEditOpen(false);
+      setSelectedStudent(null);
+      await loadData();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Gagal memperbarui data siswa.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const siswaRows = await readSheetRange("Siswa!A2:G");
+      const filteredStudentsRows = siswaRows.filter((row) => row[0] !== studentToDelete.nis);
+      const siswaUpdateRows = [...filteredStudentsRows];
+      for (let i = 0; i < siswaRows.length - filteredStudentsRows.length; i++) {
+        siswaUpdateRows.push(["", "", "", "", "", "", ""]);
+      }
+      if (siswaRows.length > 0) {
+        await updateSheetRange(`Siswa!A2:G${siswaRows.length + 1}`, siswaUpdateRows);
+      }
+
+      try {
+        const gradeRows = await readSheetRange("Penilaian!A2:G");
+        const filteredGradeRows = gradeRows.filter((row) => row[1] !== studentToDelete.nis);
+        const gradeUpdateRows = [...filteredGradeRows];
+        for (let i = 0; i < gradeRows.length - filteredGradeRows.length; i++) {
+          gradeUpdateRows.push(["", "", "", "", "", "", ""]);
+        }
+        if (gradeRows.length > 0) {
+          await updateSheetRange(`Penilaian!A2:G${gradeRows.length + 1}`, gradeUpdateRows);
+        }
+      } catch (err) {
+        console.warn("Gagal menghapus nilai terkait siswa:", err);
+      }
+
+      toast.success(`Siswa ${studentToDelete.name} berhasil dihapus.`);
+      setStudentToDelete(null);
+      setSelectedStudent(null);
+      await loadData();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Gagal menghapus data siswa.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const downloadBatchQRCodes = async (mode: "filtered" | "all") => {
     const list = mode === "filtered" ? filteredStudents : students;
     if (list.length === 0) {
@@ -389,6 +573,10 @@ export default function StudentData() {
                 toast.error("Silakan hubungkan Google Drive di Dashboard terlebih dahulu!");
                 return;
               }
+              if (!hasValidToken()) {
+                toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+                return;
+              }
               setIsAddOpen(true);
             }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-medium flex items-center gap-2 transition-colors cursor-pointer text-sm"
@@ -401,60 +589,29 @@ export default function StudentData() {
 
       {/* Onboarding Alert */}
       {!isAuthorized() && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-[12px] flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <div className="text-sm">
-            <strong>Database Belum Terhubung:</strong> Hubungkan Google Drive Anda di halaman Dashboard untuk mulai mengisi dan menyinkronkan data siswa secara live.
-          </div>
-        </div>
+        <GoogleDriveNotice
+          state="disconnected"
+          message="Hubungkan Google Drive di Dashboard untuk mulai mengisi dan menyinkronkan data siswa."
+        />
       )}
 
       {isAuthorized() && !hasValidToken() && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-[12px] flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 animate-pulse" />
-          <div className="text-sm flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <strong>Sesi Google Drive Kedaluwarsa:</strong> Sesi koneksi Google Drive Anda telah kedaluwarsa. Silakan hubungkan ulang untuk melanjutkan sinkronisasi data.
-            </div>
-            <Link
-              to="/dashboard"
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors inline-block text-center cursor-pointer whitespace-nowrap self-start sm:self-center font-sans"
-            >
-              Hubungkan Ulang
-            </Link>
-          </div>
-        </div>
+        <GoogleDriveNotice state="expired" />
       )}
 
       {/* Content Area */}
       {!isAuthorized() ? (
-        <div className="p-12 text-center text-gray-500 bg-white rounded-[12px] border border-gray-200 shadow-sm flex flex-col items-center justify-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-blue-500" />
-          <h3 className="text-lg font-semibold text-gray-900">Google Drive Belum Terhubung</h3>
-          <p className="text-gray-600 max-w-md text-sm">
-            Untuk mulai mengelola data siswa, silakan hubungkan akun Google Drive Anda terlebih dahulu di halaman Dashboard.
-          </p>
-          <Link
-            to="/dashboard"
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer inline-block"
-          >
-            Pergi ke Dashboard
-          </Link>
-        </div>
+        <GoogleDriveEmptyState
+          state="disconnected"
+          description="Data siswa tersimpan di Google Sheets milik sekolah. Hubungkan Drive sekali, lalu halaman ini akan menampilkan database siswa aktif."
+          steps={["Buka Dashboard.", "Klik Hubungkan Google Drive.", "Kembali ke Data Siswa dan klik Tambah Siswa."]}
+        />
       ) : !hasValidToken() ? (
-        <div className="p-12 text-center text-gray-500 bg-white rounded-[12px] border border-gray-200 shadow-sm flex flex-col items-center justify-center space-y-4">
-          <RefreshCw className="w-12 h-12 text-amber-500" />
-          <h3 className="text-lg font-semibold text-gray-900">Sesi Google Drive Kedaluwarsa</h3>
-          <p className="text-gray-600 max-w-md text-sm">
-            Koneksi aman Anda ke Google Drive telah berakhir. Silakan hubungkan ulang sesi Anda melalui Dashboard untuk menyinkronkan data siswa.
-          </p>
-          <Link
-            to="/dashboard"
-            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer inline-block"
-          >
-            Hubungkan Ulang di Dashboard
-          </Link>
-        </div>
+        <GoogleDriveEmptyState
+          state="expired"
+          description="Sesi Google Drive sudah tidak aktif, jadi data siswa tidak bisa dibaca atau disimpan sampai Anda menghubungkan ulang."
+          steps={["Klik Hubungkan Ulang.", "Pilih akun Google yang sama.", "Kembali ke halaman ini dan refresh data siswa."]}
+        />
       ) : (
         <>
           {/* Filters */}
@@ -524,9 +681,41 @@ export default function StudentData() {
                 Sedang sinkronisasi data dengan Google Sheets...
               </div>
             ) : filteredStudents.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                Tidak ada data siswa ditemukan.
-              </div>
+              <EmptyDataState
+                icon={<Plus className="w-7 h-7" />}
+                title={students.length === 0 ? "Belum Ada Data Siswa" : "Siswa Tidak Ditemukan"}
+                description={
+                  students.length === 0
+                    ? "Database sudah siap, tetapi belum ada siswa yang tercatat. Tambahkan siswa pertama agar absensi, nilai, dan QR bisa dipakai."
+                    : "Tidak ada siswa yang cocok dengan pencarian atau filter kelas saat ini."
+                }
+                steps={
+                  students.length === 0
+                    ? ["Klik Tambah Siswa.", "Isi identitas dasar dan kelas.", "Gunakan QR siswa untuk absensi."]
+                    : undefined
+                }
+                action={
+                  students.length === 0 ? (
+                    <button
+                      onClick={() => setIsAddOpen(true)}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Tambah Siswa Pertama
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedClass("all");
+                      }}
+                      className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  )
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -585,10 +774,24 @@ export default function StudentData() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
-                            <button className="p-2 hover:bg-blue-50 text-blue-600 rounded-[12px] transition-colors">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditStudent(student);
+                              }}
+                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-[12px] transition-colors"
+                              title="Edit siswa"
+                            >
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button className="p-2 hover:bg-red-50 text-red-600 rounded-[12px] transition-colors">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStudentToDelete(student);
+                              }}
+                              className="p-2 hover:bg-red-50 text-red-600 rounded-[12px] transition-colors"
+                              title="Hapus siswa"
+                            >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -661,6 +864,22 @@ export default function StudentData() {
                     <Download className="w-4 h-4" />
                     Download QR Code
                   </a>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button
+                      onClick={() => openEditStudent(selectedStudent)}
+                      className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-[12px] font-semibold flex items-center justify-center gap-2 transition-colors text-sm cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit Siswa
+                    </button>
+                    <button
+                      onClick={() => setStudentToDelete(selectedStudent)}
+                      className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-[12px] font-semibold flex items-center justify-center gap-2 transition-colors text-sm cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Hapus Siswa
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
@@ -698,6 +917,18 @@ export default function StudentData() {
                 placeholder="Hanya angka, bebas digit (contoh: 1001)"
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">NISN (Opsional)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={newStudent.nisn}
+                onChange={(e) => setNewStudent({ ...newStudent, nisn: e.target.value.replace(/\D/g, "") })}
+                placeholder="Nomor Induk Siswa Nasional"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
               />
             </div>
 
@@ -786,7 +1017,145 @@ export default function StudentData() {
             </button>
           </form>
         </SheetContent>
-      </Sheet>      {/* Class Subject Mapping Dialog */}
+      </Sheet>
+
+      {/* Edit Student Sheet */}
+      <Sheet open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <SheetContent className="w-[500px] p-6 overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Data Siswa</SheetTitle>
+          </SheetHeader>
+
+          <form onSubmit={handleEditStudent} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">Nama Lengkap</label>
+              <input
+                type="text"
+                value={editStudent.name}
+                onChange={(e) => setEditStudent({ ...editStudent, name: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">NIS (Nomor Induk Siswa)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editStudent.nis}
+                onChange={(e) => setEditStudent({ ...editStudent, nis: e.target.value.replace(/\D/g, "") })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">NISN (Opsional)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editStudent.nisn}
+                onChange={(e) => setEditStudent({ ...editStudent, nisn: e.target.value.replace(/\D/g, "") })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">Kelas</label>
+              <select
+                value={showEditCustomClassInput ? "custom" : editStudent.class}
+                onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    setShowEditCustomClassInput(true);
+                    setEditStudent({ ...editStudent, class: "" });
+                  } else {
+                    setShowEditCustomClassInput(false);
+                    setEditStudent({ ...editStudent, class: e.target.value });
+                  }
+                }}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 cursor-pointer"
+              >
+                {classList.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                <option value="custom">+ Kelas Baru (Input Manual)</option>
+              </select>
+            </div>
+
+            {showEditCustomClassInput && (
+              <div>
+                <label className="block text-base font-medium text-gray-700 mb-2">Nama Kelas Baru</label>
+                <input
+                  type="text"
+                  value={editCustomClassValue}
+                  onChange={(e) => {
+                    setEditCustomClassValue(e.target.value);
+                    setEditStudent({ ...editStudent, class: e.target.value });
+                  }}
+                  placeholder="Contoh: VII-E"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-blue-300 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 font-semibold"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">Gender (L/P)</label>
+              <select
+                value={editStudent.gender}
+                onChange={(e) => setEditStudent({ ...editStudent, gender: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900"
+              >
+                <option value="L">Laki-laki (L)</option>
+                <option value="P">Perempuan (P)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={editStudent.email}
+                onChange={(e) => setEditStudent({ ...editStudent, email: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">No Whatsapp</label>
+              <input
+                type="tel"
+                value={editStudent.phone}
+                onChange={(e) => setEditStudent({ ...editStudent, phone: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer text-sm"
+            >
+              {loading ? "Menyimpan..." : "Simpan Perubahan"}
+            </button>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmModal
+        isOpen={!!studentToDelete}
+        title="Hapus Siswa?"
+        message={`Data ${studentToDelete?.name || "siswa"} akan dihapus dari tab Siswa dan nilai terkait di tab Penilaian. Riwayat absensi tetap disimpan sebagai arsip.`}
+        confirmText={loading ? "Menghapus..." : "Hapus Siswa"}
+        cancelText="Batal"
+        onConfirm={handleDeleteStudent}
+        onCancel={() => setStudentToDelete(null)}
+      />
+
+      {/* Class Subject Mapping Dialog */}
       <Dialog open={isMappingOpen} onOpenChange={setIsMappingOpen}>
         <DialogContent className="max-w-xl p-6 max-h-[85vh] overflow-y-auto rounded-[16px] bg-white">
           <DialogHeader>
@@ -882,6 +1251,10 @@ export default function StudentData() {
 
           <button
             onClick={async () => {
+              if (!hasValidToken()) {
+                toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+                return;
+              }
               setLoading(true);
               try {
                 const mappingStr = JSON.stringify(classSubjectMapping);

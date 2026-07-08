@@ -46,8 +46,7 @@ import {
 import { toast } from "sonner";
 import { Link, useNavigate, useLocation } from "react-router";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
-import { useAuth } from "../../contexts/AuthContext";
-import { supabase } from "../../../utils/supabase/client";
+import { generateAIContent } from "../../lib/aiClient";
 
 // Interfaces
 interface ScoreDetail {
@@ -210,7 +209,6 @@ const getHeaderGroups = (cols: AssessmentColumn[]) => {
 };
 
 export default function Assessment() {
-  const { session } = useAuth();
   const { subscriptionTier, credits, activeWorkspaceId, refresh, aiModels } = useWorkspace();
   const isProOrAbove = ["pro", "premium", "school", "trial"].includes(subscriptionTier);
   const isPremiumOrAbove = ["premium", "school", "trial"].includes(subscriptionTier);
@@ -565,7 +563,7 @@ export default function Assessment() {
       return;
     }
 
-    if (!isAuthorized()) {
+    if (!isAuthorized() || !hasValidToken()) {
       setIsDemo(false);
       setColumnsList([
         { id: `${selectedSemester}|Formatif|Tugas|TP 1`, semester: selectedSemester, kategori: "Formatif", subkategori: "Tugas", tp: "TP 1" },
@@ -952,6 +950,10 @@ export default function Assessment() {
   };
 
   const handleSaveBobotConfig = async () => {
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
     if (rumusTypeForm !== "k13") {
       const mainKeys = ["Formatif", "STP", "STS", "SAS"];
       const sum = mainKeys.reduce((acc, k) => acc + (bobotForm[k] || 0), 0);
@@ -991,6 +993,10 @@ export default function Assessment() {
 
   const handleSaveChanges = async () => {
     if (gradesList.length === 0) return;
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
     setLoading(true);
     try {
       const newRows: any[] = [];
@@ -1128,39 +1134,24 @@ export default function Assessment() {
     });
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "student-comment",
-            model: selectedModel,
-            params: {
-              studentName: selectedRaportStudent.name,
-              subject: selectedSubject,
-              averageScore: avg,
-              class: selectedClass,
-              semester: selectedSemester,
-              highestScore: highestVal > 0 ? `${highestVal} (${highestCol.subkategori} ${highestCol.tp || ""})` : "N/A"
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "student-comment",
+        model: selectedModel,
+        params: {
+          studentName: selectedRaportStudent.name,
+          subject: selectedSubject,
+          averageScore: avg,
+          class: selectedClass,
+          semester: selectedSemester,
+          highestScore: highestVal > 0 ? `${highestVal} (${highestCol.subkategori} ${highestCol.tp || ""})` : "N/A"
         }
-      );
-      if (response.ok) {
-        const res = await response.json();
-        setRaportComment(res.content);
-        toast.success("Catatan berhasil digenerate!");
-        if (refresh) await refresh();
-      } else {
-        toast.error("Gagal generate comment.");
-      }
-    } catch {
-      toast.error("Gagal memanggil AI.");
+      });
+      setRaportComment(content);
+      toast.success("Catatan berhasil digenerate!");
+      if (refresh) await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memanggil AI.");
     } finally {
       setIsGeneratingComment(false);
     }
@@ -1168,6 +1159,10 @@ export default function Assessment() {
 
   const handleSaveRaportComment = async () => {
     if (!selectedRaportStudent) return;
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
     setIsSavingRaport(true);
     try {
       const key = `${selectedRaportStudent.nis}_${selectedSubject}_${selectedSemester}`;
@@ -1308,44 +1303,28 @@ export default function Assessment() {
     setHasGeneratedSoal(false);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "assessment",
-            model: selectedModel,
-            params: {
-              class: soalClass,
-              subject: soalSubject,
-              topic: soalTopic,
-              learningObjective: soalObjective,
-              questionType: soalQuestionType,
-              numQuestions: soalCount,
-              cognitiveLevel: soalCognitive,
-              konteks: soalKonteks,
-              notes: soalNotes
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "assessment",
+        model: selectedModel,
+        params: {
+          class: soalClass,
+          subject: soalSubject,
+          topic: soalTopic,
+          learningObjective: soalObjective,
+          questionType: soalQuestionType,
+          numQuestions: soalCount,
+          cognitiveLevel: soalCognitive,
+          konteks: soalKonteks,
+          notes: soalNotes
         }
-      );
-
-      if (response.ok) {
-        const res = await response.json();
-        setSoalGeneratedContent(res.content);
-        setHasGeneratedSoal(true);
-        toast.success("Soal berhasil dibuat!");
-        if (refresh) await refresh();
-      } else {
-        toast.error("Gagal membuat soal.");
-      }
-    } catch {
-      toast.error("Gagal memanggil AI.");
+      });
+      setSoalGeneratedContent(content);
+      setHasGeneratedSoal(true);
+      toast.success("Soal berhasil dibuat!");
+      if (refresh) await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memanggil AI.");
     } finally {
       setIsGeneratingSoal(false);
     }
@@ -1382,32 +1361,21 @@ export default function Assessment() {
     }
     setIsGeneratingKisi(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "chat",
-            model: selectedModel,
-            params: {
-              contents: [{
-                parts: [{
-                  text: `Buatlah matriks Kisi-Kisi Ujian yang terstruktur dalam bentuk tabel Markdown untuk Kelas ${selectedClass}, Mata Pelajaran ${selectedSubject}, dengan topik "${kisiTopic}" dan TP "${kisiObjective || "Mengevaluasi konsep dasar"}". Jumlah soal: ${kisiCount} soal ${kisiType}. Tabel harus memiliki kolom: No, Capaian Pembelajaran / TP, Lingkup Materi, Indikator Soal, Level Kognitif, Bentuk Soal, No Soal. Jangan berikan kalimat pembuka/penutup, langsung output tabel.`
-                }]
-              }]
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "chat",
+        model: selectedModel,
+        params: {
+          contents: [{
+            parts: [{
+              text: `Buatlah matriks Kisi-Kisi Ujian yang terstruktur dalam bentuk tabel Markdown untuk Kelas ${selectedClass}, Mata Pelajaran ${selectedSubject}, dengan topik "${kisiTopic}" dan TP "${kisiObjective || "Mengevaluasi konsep dasar"}". Jumlah soal: ${kisiCount} soal ${kisiType}. Tabel harus memiliki kolom: No, Capaian Pembelajaran / TP, Lingkup Materi, Indikator Soal, Level Kognitif, Bentuk Soal, No Soal. Jangan berikan kalimat pembuka/penutup, langsung output tabel.`
+            }]
+          }]
         }
-      );
-      const data = await response.json();
-      setKisiGenerated(data.content || "Gagal menghasilkan kisi-kisi.");
-    } catch {
-      setKisiGenerated("Gagal memanggil AI. Silakan coba lagi.");
+      });
+      setKisiGenerated(content);
+    } catch (e: any) {
+      setKisiGenerated(e.message || "Gagal memanggil AI. Silakan coba lagi.");
     } finally {
       setIsGeneratingKisi(false);
     }
@@ -1421,32 +1389,21 @@ export default function Assessment() {
     }
     setIsGeneratingRubric(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "rubric-generator",
-            model: selectedModel,
-            params: {
-              class: selectedClass,
-              subject: selectedSubject,
-              activityName: rubricActivity,
-              scale: rubricScale,
-              criteria: "Kerjasama Kelompok, Kualitas Hasil Kerja, Kemampuan Komunikasi/Presentasi"
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "rubric-generator",
+        model: selectedModel,
+        params: {
+          class: selectedClass,
+          subject: selectedSubject,
+          activityName: rubricActivity,
+          scale: rubricScale,
+          criteria: "Kerjasama Kelompok, Kualitas Hasil Kerja, Kemampuan Komunikasi/Presentasi"
         }
-      );
-      const data = await response.json();
-      setRubricGenerated(data.content || "Gagal menghasilkan rubrik.");
-    } catch {
-      setRubricGenerated("Gagal memanggil AI. Silakan coba lagi.");
+      });
+      setRubricGenerated(content);
+    } catch (e: any) {
+      setRubricGenerated(e.message || "Gagal memanggil AI. Silakan coba lagi.");
     } finally {
       setIsGeneratingRubric(false);
     }
@@ -2387,43 +2344,27 @@ export default function Assessment() {
     setAnalisisTitle(pkg.name);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "learning-analysis",
-            model: selectedModel,
-            params: {
-              className: pkg.class,
-              subject: pkg.subject,
-              assessmentTitle: pkg.name,
-              kktp: 70,
-              learningObjectives: `Memahami konsep "${pkg.questions[0]?.topic || "materi"}"`,
-              indicators: [],
-              students: answers.map(a => ({ name: a.studentName, score: a.score })),
-              stats: calculatedStats
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "learning-analysis",
+        model: selectedModel,
+        params: {
+          className: pkg.class,
+          subject: pkg.subject,
+          assessmentTitle: pkg.name,
+          kktp: 70,
+          learningObjectives: `Memahami konsep "${pkg.questions[0]?.topic || "materi"}"`,
+          indicators: [],
+          students: answers.map(a => ({ name: a.studentName, score: a.score })),
+          stats: calculatedStats
         }
-      );
-
-      if (response.ok) {
-        const res = await response.json();
-        setAnalisisGeneratedReport(res.content);
-        setHasAnalyzed(true);
-        toast.success("AI Analisis selesai!");
-        if (refresh) await refresh();
-      } else {
-        toast.error("Gagal melakukan analisis.");
-      }
-    } catch {
-      toast.error("Gagal memanggil AI.");
+      });
+      setAnalisisGeneratedReport(content);
+      setHasAnalyzed(true);
+      toast.success("AI Analisis selesai!");
+      if (refresh) await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memanggil AI.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -2454,38 +2395,22 @@ export default function Assessment() {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "chat",
-            model: selectedModel,
-            params: {
-              contents: [{
-                parts: [{
-                  text: `${promptMsg}\n\nLaporan Analisis Acuan:\n${analisisGeneratedReport}`
-                }]
-              }]
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "chat",
+        model: selectedModel,
+        params: {
+          contents: [{
+            parts: [{
+              text: `${promptMsg}\n\nLaporan Analisis Acuan:\n${analisisGeneratedReport}`
+            }]
+          }]
         }
-      );
-
-      if (response.ok) {
-        const res = await response.json();
-        setActionModalContent(res.content);
-        if (refresh) await refresh();
-      } else {
-        toast.error("Gagal men-generate dokumen.");
-      }
-    } catch {
-      toast.error("Gagal memanggil AI.");
+      });
+      setActionModalContent(content);
+      if (refresh) await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memanggil AI.");
     } finally {
       setIsGeneratingAction(false);
     }

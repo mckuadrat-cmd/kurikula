@@ -25,9 +25,9 @@ import { AIGlow } from "../components/AIComponents";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useNavigate, useLocation } from "react-router";
-import { isAuthorized, appendSheetRows, readSheetRange } from "../../lib/googleSheetsService";
+import { isAuthorized, readSheetRange, hasValidToken } from "../../lib/googleSheetsService";
+import { generateAIContent } from "../../lib/aiClient";
 import { toast } from "sonner";
-import { supabase } from "../../../utils/supabase/client";
 
 const docTypeMapping: Record<string, string> = {
   bahan_ajar: "Report",
@@ -437,7 +437,7 @@ export default function AITeachingMaterials() {
 
     // Load from Sheets database
     const loadDatabaseData = async () => {
-      if (!isAuthorized()) return;
+      if (!isAuthorized() || !hasValidToken()) return;
       try {
         const siswaRows = await readSheetRange("Siswa!A2:G");
         const rawClasses = Array.from(new Set(siswaRows.map(row => row[3]).filter(Boolean))) as string[];
@@ -510,9 +510,6 @@ export default function AITeachingMaterials() {
 
     setIsReviewing(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const tokenUser = sessionData?.session?.access_token;
-
       let docTypeLabel = "Bahan Ajar";
       if (selectedType === "lkpd") docTypeLabel = "Lembar Kerja Peserta Didik (LKPD)";
       else if (selectedType === "aktivitas") docTypeLabel = "Aktivitas Pembelajaran";
@@ -520,40 +517,21 @@ export default function AITeachingMaterials() {
       else if (selectedType === "ppt") docTypeLabel = "Materi Presentasi PPT";
       else if (selectedType === "experiment") docTypeLabel = "Panduan Praktikum";
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "educational-reviewer",
-            model: selectedModel,
-            params: {
-              documentType: docTypeLabel,
-              documentContent: generatedContent,
-              documentGoal: learningObjective || "Meningkatkan pemahaman siswa",
-              classContext: `Kelas ${selectedClass}, Mapel ${selectedSubject}`
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "educational-reviewer",
+        model: selectedModel,
+        params: {
+          documentType: docTypeLabel,
+          documentContent: generatedContent,
+          documentGoal: learningObjective || "Meningkatkan pemahaman siswa",
+          classContext: `Kelas ${selectedClass}, Mapel ${selectedSubject}`
         }
-      );
-
-      if (response.ok) {
-        const res = await response.json();
-        if (res.content) {
-          setReviewContent(res.content);
-          setPreviewTab("review");
-          toast.success("Dokumen berhasil direview oleh AI Reviewer!");
-          if (refresh) await refresh();
-        }
-      } else {
-        const errJson = await response.json().catch(() => ({}));
-        toast.error(errJson.error || "Gagal mereview dokumen.");
-      }
+      });
+      setReviewContent(content);
+      setPreviewTab("review");
+      toast.success("Dokumen berhasil direview oleh AI Reviewer!");
+      if (refresh) await refresh();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Gagal mereview dokumen.");
@@ -575,9 +553,6 @@ export default function AITeachingMaterials() {
 
     setIsImproving(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const tokenUser = sessionData?.session?.access_token;
-
       let docTypeLabel = "Bahan Ajar";
       if (selectedType === "lkpd") docTypeLabel = "Lembar Kerja Peserta Didik (LKPD)";
       else if (selectedType === "aktivitas") docTypeLabel = "Aktivitas Pembelajaran";
@@ -585,42 +560,23 @@ export default function AITeachingMaterials() {
       else if (selectedType === "ppt") docTypeLabel = "Materi Presentasi PPT";
       else if (selectedType === "experiment") docTypeLabel = "Panduan Praktikum";
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "educational-reviewer",
-            model: selectedModel,
-            params: {
-              documentType: docTypeLabel,
-              documentContent: generatedContent,
-              documentGoal: learningObjective || "Meningkatkan pemahaman siswa",
-              classContext: `Kelas ${selectedClass}, Mapel ${selectedSubject}`,
-              improveRequested: true
-            }
-          })
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "educational-reviewer",
+        model: selectedModel,
+        params: {
+          documentType: docTypeLabel,
+          documentContent: generatedContent,
+          documentGoal: learningObjective || "Meningkatkan pemahaman siswa",
+          classContext: `Kelas ${selectedClass}, Mapel ${selectedSubject}`,
+          improveRequested: true
         }
-      );
-
-      if (response.ok) {
-        const res = await response.json();
-        if (res.content) {
-          setGeneratedContent(res.content);
-          setPreviewTab("content");
-          setReviewContent("");
-          toast.success("Dokumen berhasil diperbaiki berdasarkan saran AI!");
-          if (refresh) await refresh();
-        }
-      } else {
-        const errJson = await response.json().catch(() => ({}));
-        toast.error(errJson.error || "Gagal memperbaiki dokumen.");
-      }
+      });
+      setGeneratedContent(content);
+      setPreviewTab("content");
+      setReviewContent("");
+      toast.success("Dokumen berhasil diperbaiki berdasarkan saran AI!");
+      if (refresh) await refresh();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Gagal memperbaiki dokumen.");
@@ -697,49 +653,15 @@ export default function AITeachingMaterials() {
     }
 
     try {
-      let finalContent = "";
-      if (isAuthorized() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          const tokenUser = sessionData?.session?.access_token;
-
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-              },
-              body: JSON.stringify({
-                workspaceId: activeWorkspaceId,
-                type: backendType,
-                model: selectedModel,
-                params
-              })
-            }
-          );
-          if (response.ok) {
-            const res = await response.json();
-            if (res.content) {
-              finalContent = res.content;
-              if (refresh) {
-                await refresh();
-              }
-            }
-          } else {
-            const errJson = await response.json().catch(() => ({}));
-            toast.error(errJson.error || "Gagal menghasilkan bahan ajar.");
-          }
-        } catch (e) {
-          console.warn("AI Function failed, falling back to local model template:", e);
-        }
+      const finalContent = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: backendType,
+        model: selectedModel,
+        params
+      });
+      if (refresh) {
+        await refresh();
       }
-
-      if (!finalContent) {
-        finalContent = generateFallbackTeachingMaterial(selectedType, params);
-      }
-
       setGeneratedContent(finalContent);
       setHasGenerated(true);
       toast.success("Bahan Ajar berhasil digenerate!");

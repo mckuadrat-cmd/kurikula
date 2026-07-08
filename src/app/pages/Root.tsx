@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { Outlet, Navigate, useLocation } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X } from "lucide-react";
@@ -6,6 +6,17 @@ import { AppSidebar } from "../components/AppSidebar";
 import { AIChatPanel } from "../components/AIChatPanel";
 import { useAuth } from "../../contexts/AuthContext";
 import logoWithText from "../../assets/kurikula.png";
+
+function PageLoading() {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center">
+        <div className="w-10 h-10 border-4 border-[#F0EAC6] border-t-[#3C405B] rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-sm font-semibold text-gray-500">Memuat halaman...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Root() {
   const { user, profile, loading, isSuperAdmin } = useAuth();
@@ -44,7 +55,9 @@ export default function Root() {
     return (
       <div className="flex h-screen bg-[#F4F6F9] overflow-hidden">
         <main className="flex-1 overflow-y-auto flex flex-col p-4 md:p-8">
-          <Outlet />
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     );
@@ -114,7 +127,9 @@ export default function Root() {
           </header>
 
           <main className="flex-1 flex flex-col min-h-0">
-            <Outlet />
+            <Suspense fallback={<PageLoading />}>
+              <Outlet />
+            </Suspense>
           </main>
         </div>
       </div>

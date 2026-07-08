@@ -1,26 +1,28 @@
 import { createBrowserRouter } from "react-router";
-import Root from "./pages/Root";
-import Login from "./pages/Login";
-import SignUp from "./pages/SignUp";
-import Dashboard from "./pages/Dashboard";
-import Attendance from "./pages/Attendance";
-import StudentData from "./pages/StudentData";
-import Assessment from "./pages/Assessment";
-import AILessonPlanner from "./pages/AILessonPlanner";
-import AITeachingMaterials from "./pages/AITeachingMaterials";
-import SemesterPlanner from "./pages/SemesterPlanner";
-import Administration from "./pages/Administration";
-import Billing from "./pages/Billing";
-import Settings from "./pages/Settings";
-import SuperAdmin from "./pages/SuperAdmin";
-import SchoolAdmin from "./pages/SchoolAdmin";
-import LandingPage from "./pages/LandingPage";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentFailed from "./pages/PaymentFailed";
-import TermsOfService from "./pages/TermsOfService";
-import ResetPassword from "./pages/ResetPassword";
-import AIChatPage from "./pages/AIChatPage";
+import { lazy } from "react";
+
+const Root = lazy(() => import("./pages/Root"));
+const Login = lazy(() => import("./pages/Login"));
+const SignUp = lazy(() => import("./pages/SignUp"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Attendance = lazy(() => import("./pages/Attendance"));
+const StudentData = lazy(() => import("./pages/StudentData"));
+const Assessment = lazy(() => import("./pages/Assessment"));
+const AILessonPlanner = lazy(() => import("./pages/AILessonPlanner"));
+const AITeachingMaterials = lazy(() => import("./pages/AITeachingMaterials"));
+const SemesterPlanner = lazy(() => import("./pages/SemesterPlanner"));
+const Administration = lazy(() => import("./pages/Administration"));
+const Billing = lazy(() => import("./pages/Billing"));
+const Settings = lazy(() => import("./pages/Settings"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const SchoolAdmin = lazy(() => import("./pages/SchoolAdmin"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentFailed = lazy(() => import("./pages/PaymentFailed"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AIChatPage = lazy(() => import("./pages/AIChatPage"));
 
 export const router = createBrowserRouter([
   {

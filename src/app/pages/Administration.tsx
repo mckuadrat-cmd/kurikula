@@ -14,7 +14,7 @@ import {
   Info,
   Check
 } from "lucide-react";
-import { isAuthorized, readSheetRange, updateSheetRange } from "../../lib/googleSheetsService";
+import { isAuthorized, readSheetRange, updateSheetRange, hasValidToken } from "../../lib/googleSheetsService";
 import { toast } from "sonner";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 
@@ -125,7 +125,7 @@ export default function Administration() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const authorized = isAuthorized();
+      const authorized = isAuthorized() && hasValidToken();
       if (authorized) {
         const rows = await readSheetRange("Dokumen!A2:G");
         const formattedDocs = rows.map((row) => ({
@@ -170,6 +170,11 @@ export default function Administration() {
         setSelectedDoc(null);
       }
       toast.success("Dokumen dihapus (Mode Demo)");
+      return;
+    }
+
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
       return;
     }
 
@@ -642,4 +647,3 @@ export default function Administration() {
     </div>
   );
 }
-

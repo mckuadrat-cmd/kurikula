@@ -18,6 +18,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { supabase } from "../../../utils/supabase/client";
+import { generateAIContent } from "../../lib/aiClient";
 
 // Markdown helper functions
 function parseInlineMarkdown(text: string) {
@@ -415,69 +416,41 @@ export default function AIChatPage() {
         parts: [{ text: messageText }],
       });
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const tokenUser = sessionData?.session?.access_token;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            workspaceId: activeWorkspaceId,
-            type: "chat",
-            model: selectedModel,
-            params: {
-              contents: formattedHistory,
-              context: {
-                teacherProfile: profile ? `${profile.name || ""} - Guru ${profile.schoolLevel || ""}` : null,
-                activeClass: localStorage.getItem("daftar_kelas")?.split(",")?.[0]?.trim() || null,
-                activeSubject: localStorage.getItem("mata_pelajaran")?.split(",")?.[0]?.trim() || null,
-                lastDocument: "Halaman Tanya Guru AI",
-                lastSemesterPlan: localStorage.getItem("rencana_semester_data") ? "Rencana semester telah dikonfigurasi" : null,
-                lastModule: null,
-                teacherMemory: teacherMemoryContext
-              }
-            }
-          })
-        }
-      );
-
-      let res;
-      try {
-        res = await response.json();
-      } catch {
-        throw new Error(`Server merespon dengan status ${response.status}`);
-      }
-
-      if (!response.ok) {
-        throw new Error(res.error || "Gagal mendapatkan respons AI.");
-      }
-
-      if (res.content) {
-        await supabase.from("ai_messages").insert({
-          conversation_id: activeConversationId,
-          role: "assistant",
-          content: res.content
-        });
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: res.content
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "chat",
+        model: selectedModel,
+        params: {
+          contents: formattedHistory,
+          context: {
+            teacherProfile: profile ? `${profile.name || ""} - Guru ${profile.schoolLevel || ""}` : null,
+            activeClass: localStorage.getItem("daftar_kelas")?.split(",")?.[0]?.trim() || null,
+            activeSubject: localStorage.getItem("mata_pelajaran")?.split(",")?.[0]?.trim() || null,
+            lastDocument: "Halaman Tanya Guru AI",
+            lastSemesterPlan: localStorage.getItem("rencana_semester_data") ? "Rencana semester telah dikonfigurasi" : null,
+            lastModule: null,
+            teacherMemory: teacherMemoryContext
           }
-        ]);
-
-        if (refresh) {
-          await refresh();
         }
-      } else {
-        throw new Error("Respons kosong dari server.");
+      });
+
+      await supabase.from("ai_messages").insert({
+        conversation_id: activeConversationId,
+        role: "assistant",
+        content
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content
+        }
+      ]);
+
+      if (refresh) {
+        await refresh();
       }
     } catch (e: any) {
       console.error(e);

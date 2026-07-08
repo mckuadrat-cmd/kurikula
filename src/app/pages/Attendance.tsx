@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "motion/react";
 import { QrCode, Camera, Download, CheckCircle, XCircle, AlertCircle, Search, RefreshCw, Save } from "lucide-react";
-import { isAuthorized, readSheetRange, appendSheetRows, updateSheetRange, checkAndRenewToken, hasValidToken } from "../../lib/googleSheetsService";
+import { isAuthorized, readSheetRange, appendSheetRows, updateSheetRange, hasValidToken } from "../../lib/googleSheetsService";
 import { toast } from "sonner";
 import { Link, useLocation, useBlocker } from "react-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { Html5Qrcode } from "html5-qrcode";
+import { EmptyDataState, GoogleDriveEmptyState, GoogleDriveNotice } from "../components/GoogleDriveState";
 
 
 const statusConfig = {
@@ -166,7 +167,7 @@ export default function Attendance() {
       return;
     }
 
-    if (!isAuthorized()) {
+    if (!isAuthorized() || !hasValidToken()) {
       setAttendanceList([]);
       setIsDemo(false);
       return;
@@ -443,6 +444,11 @@ export default function Attendance() {
       return;
     }
 
+    if (!hasValidToken()) {
+      toast.error("Sesi Google Drive kedaluwarsa. Silakan hubungkan ulang di Dashboard.");
+      return;
+    }
+
     setLoading(true);
     try {
       const updates = unsavedChanges.filter(s => s.logRowIndex !== null);
@@ -620,60 +626,32 @@ export default function Attendance() {
 
       {/* Onboarding Alert */}
       {!isAuthorized() && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-[12px] flex items-center gap-3 flex-shrink-0">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <div className="text-sm">
-            <strong>Database Belum Terhubung:</strong> Hubungkan Google Drive Anda di halaman Dashboard untuk mulai merekam kehadiran siswa secara live.
-          </div>
-        </div>
+        <GoogleDriveNotice
+          state="disconnected"
+          message="Hubungkan Google Drive di Dashboard untuk mulai merekam dan menyinkronkan kehadiran siswa."
+          className="flex-shrink-0"
+        />
       )}
 
       {isAuthorized() && !hasValidToken() && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-[12px] flex items-center gap-3 flex-shrink-0">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 animate-pulse" />
-          <div className="text-sm flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <strong>Sesi Google Drive Kedaluwarsa:</strong> Sesi koneksi Google Drive Anda telah kedaluwarsa. Silakan hubungkan ulang untuk melanjutkan sinkronisasi data.
-            </div>
-            <Link
-              to="/dashboard"
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors inline-block text-center cursor-pointer whitespace-nowrap self-start sm:self-center font-sans"
-            >
-              Hubungkan Ulang
-            </Link>
-          </div>
-        </div>
+        <GoogleDriveNotice state="expired" className="flex-shrink-0" />
       )}
 
       {/* Content Area */}
       {!isAuthorized() ? (
-        <div className="p-12 text-center text-gray-500 bg-white rounded-[12px] border border-gray-200 shadow-sm flex flex-col items-center justify-center space-y-4 flex-1">
-          <AlertCircle className="w-12 h-12 text-blue-500" />
-          <h3 className="text-lg font-semibold text-gray-900">Google Drive Belum Terhubung</h3>
-          <p className="text-gray-600 max-w-md text-sm">
-            Untuk mulai menggunakan absensi QR, silakan hubungkan akun Google Drive Anda terlebih dahulu di halaman Dashboard.
-          </p>
-          <Link
-            to="/dashboard"
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer inline-block"
-          >
-            Pergi ke Dashboard
-          </Link>
-        </div>
+        <GoogleDriveEmptyState
+          state="disconnected"
+          description="Absensi QR membutuhkan database siswa dari Google Sheets. Hubungkan Drive dulu agar daftar siswa dan riwayat hadir bisa disimpan."
+          steps={["Buka Dashboard.", "Hubungkan Google Drive.", "Tambahkan siswa di menu Data Siswa, lalu kembali ke Absensi."]}
+          className="flex-1"
+        />
       ) : !hasValidToken() ? (
-        <div className="p-12 text-center text-gray-500 bg-white rounded-[12px] border border-gray-200 shadow-sm flex flex-col items-center justify-center space-y-4 flex-1">
-          <RefreshCw className="w-12 h-12 text-amber-500" />
-          <h3 className="text-lg font-semibold text-gray-900">Sesi Google Drive Kedaluwarsa</h3>
-          <p className="text-gray-600 max-w-md text-sm">
-            Koneksi aman Anda ke Google Drive telah berakhir. Silakan hubungkan ulang sesi Anda melalui Dashboard untuk menyinkronkan data absensi.
-          </p>
-          <Link
-            to="/dashboard"
-            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer inline-block"
-          >
-            Hubungkan Ulang di Dashboard
-          </Link>
-        </div>
+        <GoogleDriveEmptyState
+          state="expired"
+          description="Sesi Google Drive sudah berakhir, jadi daftar siswa dan absensi tidak bisa disinkronkan sampai Anda menghubungkan ulang."
+          steps={["Klik Hubungkan Ulang.", "Pilih akun Google yang sama.", "Kembali ke Absensi dan refresh data."]}
+          className="flex-1"
+        />
       ) : (
         <>
           {/* Stats */}
@@ -801,9 +779,38 @@ export default function Attendance() {
                   Menyinkronkan data kehadiran dengan Google Sheets...
                 </div>
               ) : filteredAttendance.length === 0 ? (
-                <div className="p-12 text-center text-gray-500 flex-1 flex flex-col justify-center items-center">
-                  Tidak ada data siswa untuk kelas ini.
-                </div>
+                <EmptyDataState
+                  icon={<QrCode className="w-7 h-7" />}
+                  title={attendanceList.length === 0 ? "Belum Ada Siswa untuk Diabsen" : "Siswa Tidak Ditemukan"}
+                  description={
+                    attendanceList.length === 0
+                      ? "Absensi mengambil daftar siswa dari menu Data Siswa. Tambahkan siswa dan pastikan kelasnya sesuai dengan filter absensi."
+                      : "Tidak ada siswa yang cocok dengan pencarian saat ini."
+                  }
+                  steps={
+                    attendanceList.length === 0
+                      ? ["Buka menu Data Siswa.", "Tambahkan siswa beserta kelasnya.", "Kembali ke Absensi lalu pilih kelas yang sesuai."]
+                      : undefined
+                  }
+                  action={
+                    attendanceList.length === 0 ? (
+                      <Link
+                        to="/students"
+                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer"
+                      >
+                        Buka Data Siswa
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-[12px] font-semibold text-sm transition-colors cursor-pointer"
+                      >
+                        Reset Pencarian
+                      </button>
+                    )
+                  }
+                  className="flex-1"
+                />
               ) : (
                 <div className="space-y-2 flex-1 overflow-y-auto pr-1 min-h-0">
                   {filteredAttendance.map((student, index) => {
@@ -990,4 +997,3 @@ export default function Attendance() {
     </div>
   );
 }
-

@@ -5,9 +5,9 @@ import { AIGlow, AIButton } from "../components/AIComponents";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useNavigate, useLocation } from "react-router";
-import { isAuthorized, appendSheetRows, readSheetRange } from "../../lib/googleSheetsService";
+import { appendSheetRows, readSheetRange, isAuthorized, hasValidToken } from "../../lib/googleSheetsService";
+import { generateAIContent } from "../../lib/aiClient";
 import { toast } from "sonner";
-import { supabase } from "../../../utils/supabase/client";
 
 const assessmentInstruments = [
   "Tes Tertulis",
@@ -370,82 +370,40 @@ export default function AILessonPlanner() {
     setIsGenerating(true);
     setPreviewTab("content");
     try {
-      if (isAuthorized() && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const tokenUser = sessionData?.session?.access_token;
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/generate-ai`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${tokenUser || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              workspaceId: activeWorkspaceId,
-              type: "lesson-plan",
-              model: selectedModel,
-              params: {
-                targetYear: period.tahunAjaran,
-                targetSemester: period.semester,
-                jenjang: jenjang || "SMA",
-                class: selectedClass,
-                subject: selectedSubject,
-                pertemuan: pertemuanKe,
-                topic,
-                duration,
-                objectives: tujuanPembelajaran,
-                targetKarakter,
-                method: modelPembelajaran,
-                instruments: selectedInstruments,
-                notes: catatanTambahan,
-                kemampuanAwal,
-                kondisiKelas,
-                jumlahSiswa,
-                tantanganKelas,
-                saranaPrasarana
-              }
-            })
-          }
-        );
-        if (response.ok) {
-          const res = await response.json();
-          if (res.content) {
-            setGeneratedContent(res.content);
-            setHasGenerated(true);
-            toast.success("Modul Ajar berhasil digenerate!");
-            if (refresh) {
-              await refresh();
-            }
-          }
-        } else {
-          const errJson = await response.json().catch(() => ({}));
-          toast.error(errJson.error || "Gagal membuat modul ajar.");
+      const content = await generateAIContent({
+        workspaceId: activeWorkspaceId,
+        type: "lesson-plan",
+        model: selectedModel,
+        params: {
+          targetYear: period.tahunAjaran,
+          targetSemester: period.semester,
+          jenjang: jenjang || "SMA",
+          class: selectedClass,
+          subject: selectedSubject,
+          pertemuan: pertemuanKe,
+          topic,
+          duration,
+          objectives: tujuanPembelajaran,
+          targetKarakter,
+          method: modelPembelajaran,
+          instruments: selectedInstruments,
+          notes: catatanTambahan,
+          kemampuanAwal,
+          kondisiKelas,
+          jumlahSiswa,
+          tantanganKelas,
+          saranaPrasarana
         }
-      } else {
-        // Fallback demo generation
-        setTimeout(() => {
-          setGeneratedContent(generateFallbackLessonPlan({
-            jenjang,
-            class: selectedClass,
-            subject: selectedSubject,
-            pertemuan: pertemuanKe,
-            duration,
-            topic,
-            objectives: tujuanPembelajaran,
-            targetKarakter,
-            method: modelPembelajaran,
-            instruments: selectedInstruments,
-            notes: catatanTambahan
-          }));
-          setHasGenerated(true);
-          toast.success("Modul Ajar berhasil digenerate (Mode Demo)!");
-        }, 2000);
+      });
+      setGeneratedContent(content);
+      setHasGenerated(true);
+      toast.success("Modul Ajar berhasil digenerate!");
+      if (refresh) {
+        await refresh();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Gagal melakukan generate modul ajar.");
+      toast.error(e.message || "Gagal melakukan generate modul ajar.");
     } finally {
       setIsGenerating(false);
     }
@@ -453,6 +411,10 @@ export default function AILessonPlanner() {
 
   const handleSaveToLibrary = async () => {
     if (!generatedContent) return;
+    if (!isAuthorized() || !hasValidToken()) {
+      toast.error("Hubungkan ulang Google Drive di Dashboard untuk menyimpan dokumen ke library.");
+      return;
+    }
     setIsSavingToLibrary(true);
     try {
       const todayStr = new Date().toLocaleDateString("id-ID", {
