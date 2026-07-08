@@ -67,7 +67,7 @@ export default function Root() {
     <div className="flex h-screen bg-white overflow-hidden relative">
       
       {/* Sidebar - Desktop (Static) */}
-      <div className="hidden md:block flex-shrink-0 relative z-20">
+      <div className="hidden md:block flex-shrink-0 relative z-40">
         <AppSidebar />
       </div>
 
