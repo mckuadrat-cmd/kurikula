@@ -128,7 +128,7 @@ export function AppSidebar() {
         {sidebarItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
-          const isInactiveLock = subscriptionTier === "inactive" && item.path !== "/billing" && item.path !== "/";
+          const isInactiveLock = subscriptionTier === "inactive" && item.path !== "/billing" && item.path !== "/" && item.path !== "/dashboard";
           const isCreditHabisLock = item.isAI && (credits?.balance ?? 0) <= 0;
           const isLocked = !isSuperAdmin && (isInactiveLock || isCreditHabisLock);
 

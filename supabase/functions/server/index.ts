@@ -735,7 +735,7 @@ app.get("/make-server-84c63b2a/admin/users", async (c) => {
 
     const { data: members, error: memErr } = await supabase
       .from("workspace_members")
-      .select("user_id, role, workspace_id, workspaces(id, name, type)");
+      .select("user_id, role, workspace_id, workspaces(id, name, type, subscription_tier, subscription_status, subscription_expires_at, billing_cycle)");
     if (memErr) throw memErr;
 
     const { data: credits, error: credErr } = await supabase
@@ -756,6 +756,10 @@ app.get("/make-server-84c63b2a/admin/users", async (c) => {
           balance: wsCredits?.balance ?? 0,
           total_earned: 0,
           total_spent: wsCredits?.total_spent ?? 0,
+          subscription_tier: m.workspaces?.subscription_tier ?? "inactive",
+          subscription_status: m.workspaces?.subscription_status ?? "inactive",
+          subscription_expires_at: m.workspaces?.subscription_expires_at ?? null,
+          billing_cycle: m.workspaces?.billing_cycle ?? null,
         };
       });
 
@@ -1094,6 +1098,54 @@ app.post("/make-server-84c63b2a/admin/users/:id/add-tokens", async (c) => {
     if (upsertErr) throw upsertErr;
 
     return c.json({ success: true, message: `Successfully added ${amount} tokens.` });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 4.5. POST /admin/workspaces/:id/update-subscription - Mengubah status langganan workspace
+app.post("/make-server-84c63b2a/admin/workspaces/:id/update-subscription", async (c) => {
+  const admin = await verifySuperAdmin(c);
+  if (!admin) return c.json({ error: "Unauthorized. Super Admin only." }, 401);
+  const workspaceId = c.req.param("id");
+  const { subscription_tier, subscription_status, subscription_expires_at, billing_cycle } = await c.req.json();
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const updateData: any = {};
+    if (subscription_tier !== undefined) updateData.subscription_tier = subscription_tier;
+    if (subscription_status !== undefined) updateData.subscription_status = subscription_status;
+    updateData.subscription_expires_at = subscription_expires_at;
+    if (billing_cycle !== undefined) updateData.billing_cycle = billing_cycle;
+
+    const { data: updatedWs, error: updateErr } = await supabase
+      .from("workspaces")
+      .update(updateData)
+      .eq("id", workspaceId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // Catat histori ke payment_transactions dengan status success dan amount 0
+    if (subscription_tier && subscription_tier !== "inactive") {
+      const orderId = `adm-gnt-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      await supabase.from("payment_transactions").insert({
+        workspace_id: workspaceId,
+        user_id: admin.id,
+        order_id: orderId,
+        amount: 0,
+        tier_key: subscription_tier,
+        status: "success",
+        billing_cycle: billing_cycle || "monthly"
+      });
+    }
+
+    return c.json({ success: true, message: "Subscription updated successfully.", workspace: updatedWs });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

@@ -22,6 +22,7 @@ import {
   School,
   Building,
   LogOut,
+  Gift,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -59,6 +60,15 @@ export default function SuperAdmin() {
   const [selectedWorkspaceForToken, setSelectedWorkspaceForToken] = useState<string>("");
   const [tokenAmountInput, setTokenAmountInput] = useState<number>(100);
   const [isTokenLoading, setIsTokenLoading] = useState(false);
+
+  // Modal Subscription States
+  const [selectedUserForSubscription, setSelectedUserForSubscription] = useState<any | null>(null);
+  const [selectedWorkspaceForSubscription, setSelectedWorkspaceForSubscription] = useState<string>("");
+  const [subscriptionTierInput, setSubscriptionTierInput] = useState<string>("trial");
+  const [subscriptionStatusInput, setSubscriptionStatusInput] = useState<string>("active");
+  const [subscriptionExpiryInput, setSubscriptionExpiryInput] = useState<string>("2026-08-14");
+  const [subscriptionBillingCycleInput, setSubscriptionBillingCycleInput] = useState<string>("monthly");
+  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(false);
 
   const [selectedUserForPromote, setSelectedUserForPromote] = useState<any | null>(null);
   const [schoolNameInput, setSchoolNameInput] = useState("");
@@ -256,6 +266,133 @@ export default function SuperAdmin() {
       toast.error(err.message || "Terjadi kesalahan.");
     } finally {
       setIsTokenLoading(false);
+    }
+  };
+
+  // Subscription helper badges & formatting
+  const getSubscriptionTierBadge = (tier: string, expiresAt: string | null) => {
+    const isExpired = expiresAt && new Date(expiresAt) < new Date();
+    if (isExpired) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+          Expired ({tier})
+        </span>
+      );
+    }
+
+    switch (tier) {
+      case "trial":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+            Trial
+          </span>
+        );
+      case "basic":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">
+            Basic
+          </span>
+        );
+      case "pro":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-pink-50 text-pink-700 border border-pink-100">
+            Pro
+          </span>
+        );
+      case "premium":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+            Premium
+          </span>
+        );
+      case "school":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+            School
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+            Inactive
+          </span>
+        );
+    }
+  };
+
+  const formatExpiryDate = (expiresAt: string | null) => {
+    if (!expiresAt) return <span className="text-slate-400 font-medium">Selamanya</span>;
+    const expiryDate = new Date(expiresAt);
+    const isExpired = expiryDate < new Date();
+    const formatted = expiryDate.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return (
+      <span className={`font-semibold ${isExpired ? "text-rose-600" : "text-slate-700"}`}>
+        {formatted}
+      </span>
+    );
+  };
+
+  const openSubscriptionModal = (user: any, row: any) => {
+    setSelectedUserForSubscription(user);
+    setSelectedWorkspaceForSubscription(row.workspace_id);
+    setSubscriptionTierInput(row.subscription_tier || "trial");
+    setSubscriptionStatusInput(row.subscription_status || "active");
+    setSubscriptionExpiryInput(
+      row.subscription_expires_at
+        ? new Date(row.subscription_expires_at).toISOString().split("T")[0]
+        : ""
+    );
+    setSubscriptionBillingCycleInput(row.billing_cycle || "monthly");
+  };
+
+  const handleUpdateSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.access_token || !selectedWorkspaceForSubscription) return;
+
+    setIsSubscriptionLoading(true);
+    toast.loading("Memperbarui langganan workspace...");
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/server/make-server-84c63b2a/admin/workspaces/${selectedWorkspaceForSubscription}/update-subscription`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            subscription_tier: subscriptionTierInput,
+            subscription_status: subscriptionStatusInput,
+            subscription_expires_at: subscriptionExpiryInput ? new Date(subscriptionExpiryInput).toISOString() : null,
+            billing_cycle: subscriptionBillingCycleInput,
+          }),
+        }
+      );
+
+      const textResponse = await response.text();
+      let data;
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        throw new Error(`Respons server tidak valid (Status ${response.status}): ${textResponse.substring(0, 50)}`);
+      }
+      
+      toast.dismiss();
+      if (!response.ok) throw new Error(data?.error || "Gagal memperbarui langganan");
+
+      toast.success("Langganan workspace berhasil diperbarui!");
+      setSelectedUserForSubscription(null);
+      fetchUsers();
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Terjadi kesalahan.");
+    } finally {
+      setIsSubscriptionLoading(false);
     }
   };
 
@@ -566,6 +703,10 @@ export default function SuperAdmin() {
           workspace_role: "",
           balance: 0,
           is_first: true,
+          subscription_tier: "inactive",
+          subscription_status: "inactive",
+          subscription_expires_at: null,
+          billing_cycle: null,
         },
       ];
     }
@@ -578,6 +719,10 @@ export default function SuperAdmin() {
       workspace_role: w.role,
       balance: w.balance,
       is_first: idx === 0,
+      subscription_tier: w.subscription_tier || "inactive",
+      subscription_status: w.subscription_status || "inactive",
+      subscription_expires_at: w.subscription_expires_at || null,
+      billing_cycle: w.billing_cycle || null,
     }));
   });
 
@@ -709,6 +854,8 @@ export default function SuperAdmin() {
                     <th className="px-6 py-4">Type</th>
                     <th className="px-6 py-4">Role</th>
                     <th className="px-6 py-4">Token</th>
+                    <th className="px-6 py-4">Paket Langganan</th>
+                    <th className="px-6 py-4">Expired Date</th>
                     <th className="px-6 py-4">Google Drive</th>
                     <th className="px-6 py-4">Status Akun</th>
                     <th className="px-6 py-4 text-right">Aksi</th>
@@ -793,6 +940,12 @@ export default function SuperAdmin() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
+                          {getSubscriptionTierBadge(row.subscription_tier, row.subscription_expires_at)}
+                        </td>
+                        <td className="px-6 py-4">
+                          {formatExpiryDate(row.subscription_expires_at)}
+                        </td>
+                        <td className="px-6 py-4">
                           {u.google_spreadsheet_id ? (
                             <a
                               href={`https://docs.google.com/spreadsheets/d/${u.google_spreadsheet_id}`}
@@ -823,6 +976,17 @@ export default function SuperAdmin() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Kelola Langganan */}
+                            {row.workspace_id && (
+                              <button
+                                onClick={() => openSubscriptionModal(u, row)}
+                                className="p-2 text-indigo-600 hover:bg-indigo-100/60 rounded-[8px] transition-colors"
+                                title="Kelola Akses & Langganan"
+                              >
+                                <CreditCard className="w-4 h-4" />
+                              </button>
+                            )}
+
                             {/* Add Token */}
                             {row.workspace_id && (
                               <button
@@ -1298,6 +1462,191 @@ export default function SuperAdmin() {
                     type="button"
                     onClick={() => setSelectedUserForToken(null)}
                     className="px-5 py-3 border border-slate-200 rounded-[12px] text-sm font-semibold hover:bg-slate-50 text-slate-600"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL KELOLA AKSES & LANGGANAN */}
+        {selectedUserForSubscription && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[24px] border border-slate-200 shadow-2xl p-6 w-full max-w-md animate-fade-in"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-indigo-600 animate-pulse" />
+                  Kelola Akses & Langganan
+                </h3>
+                <button
+                  onClick={() => setSelectedUserForSubscription(null)}
+                  className="p-1 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateSubscription} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">User / Penerima</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={`${selectedUserForSubscription.name} (${selectedUserForSubscription.email})`}
+                    className="w-full px-4 py-2 bg-slate-55 border border-slate-200 rounded-[12px] text-slate-500 text-sm font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Workspace</label>
+                  <select
+                    value={selectedWorkspaceForSubscription}
+                    onChange={(e) => {
+                      const wsId = e.target.value;
+                      setSelectedWorkspaceForSubscription(wsId);
+                      const ws = selectedUserForSubscription.workspaces?.find((w: any) => w.workspace_id === wsId);
+                      if (ws) {
+                        setSubscriptionTierInput(ws.subscription_tier || "trial");
+                        setSubscriptionStatusInput(ws.subscription_status || "active");
+                        setSubscriptionExpiryInput(
+                          ws.subscription_expires_at
+                            ? new Date(ws.subscription_expires_at).toISOString().split("T")[0]
+                            : ""
+                        );
+                        setSubscriptionBillingCycleInput(ws.billing_cycle || "monthly");
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-[12px] text-slate-700 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    {selectedUserForSubscription.workspaces?.map((w: any) => (
+                      <option key={w.workspace_id} value={w.workspace_id}>
+                        {w.name} ({w.type === "school" ? "Sekolah" : "Personal"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pilih Paket (Tier)</label>
+                    <select
+                      value={subscriptionTierInput}
+                      onChange={(e) => setSubscriptionTierInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-[12px] text-slate-700 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="trial">Trial</option>
+                      <option value="basic">Basic</option>
+                      <option value="pro">Pro</option>
+                      <option value="premium">Premium</option>
+                      <option value="school">School</option>
+                      <option value="inactive">Nonaktif (Inactive)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Billing Cycle</label>
+                    <select
+                      value={subscriptionBillingCycleInput}
+                      onChange={(e) => setSubscriptionBillingCycleInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-[12px] text-slate-700 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="monthly">Bulanan (Monthly)</option>
+                      <option value="yearly">Tahunan (Yearly)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
+                  <select
+                    value={subscriptionStatusInput}
+                    onChange={(e) => setSubscriptionStatusInput(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-[12px] text-slate-700 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tanggal Kedaluwarsa (Expired Date)</label>
+                  <input
+                    type="date"
+                    value={subscriptionExpiryInput}
+                    onChange={(e) => setSubscriptionExpiryInput(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-[12px] text-slate-800 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Kosongkan jika ingin akses selamanya tanpa batas.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Preset Perpanjang Paket</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentVal = subscriptionExpiryInput ? new Date(subscriptionExpiryInput) : new Date();
+                        const baseDate = currentVal > new Date() ? currentVal : new Date();
+                        baseDate.setDate(baseDate.getDate() + 30);
+                        setSubscriptionExpiryInput(baseDate.toISOString().split("T")[0]);
+                      }}
+                      className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-[8px] transition-colors text-center border border-slate-200 cursor-pointer"
+                    >
+                      +30 Hari
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentVal = subscriptionExpiryInput ? new Date(subscriptionExpiryInput) : new Date();
+                        const baseDate = currentVal > new Date() ? currentVal : new Date();
+                        baseDate.setDate(baseDate.getDate() + 90);
+                        setSubscriptionExpiryInput(baseDate.toISOString().split("T")[0]);
+                      }}
+                      className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-[8px] transition-colors text-center border border-slate-200 cursor-pointer"
+                    >
+                      +90 Hari
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentVal = subscriptionExpiryInput ? new Date(subscriptionExpiryInput) : new Date();
+                        const baseDate = currentVal > new Date() ? currentVal : new Date();
+                        baseDate.setDate(baseDate.getDate() + 365);
+                        setSubscriptionExpiryInput(baseDate.toISOString().split("T")[0]);
+                      }}
+                      className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-[8px] transition-colors text-center border border-slate-200 cursor-pointer"
+                    >
+                      +1 Tahun
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSubscriptionExpiryInput("")}
+                      className="px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-[8px] transition-colors text-center border border-indigo-100 cursor-pointer"
+                    >
+                      No Limit
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubscriptionLoading}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[12px] text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm cursor-pointer hover:shadow-indigo-100 hover:shadow-lg"
+                  >
+                    {isSubscriptionLoading ? "Memproses..." : "Simpan Langganan"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserForSubscription(null)}
+                    className="px-5 py-3 border border-slate-200 rounded-[12px] text-sm font-semibold hover:bg-slate-55 text-slate-600 cursor-pointer transition-colors"
                   >
                     Batal
                   </button>
